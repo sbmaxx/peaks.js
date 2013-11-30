@@ -155,7 +155,7 @@ module.exports = function(grunt) {
   grunt.loadNpmTasks('grunt-contrib-requirejs');
   grunt.loadNpmTasks('grunt-contrib-watch');
 
-  grunt.loadNpmTasks('grunt-bower-install');
+  //grunt.loadNpmTasks('grunt-bower-install');
   grunt.loadNpmTasks('grunt-open');
   grunt.loadNpmTasks('grunt-concurrent');
 
@@ -176,7 +176,7 @@ module.exports = function(grunt) {
 
   // Start a dev server for working on the precomiled files
   grunt.registerTask('server-dev', [
-    'bower-install:dev',
+    //'bower-install:dev',
     'sass',
     'jshint:all',
     'compile-handlebars',
