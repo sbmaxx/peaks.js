@@ -58,15 +58,13 @@
               startTime: 120,
               endTime: 140,
               editable: true,
-              color: "#ff0000",
-              labelText: "My First Demo Segment"
+              color: "#ff0000"
             },
             {
               startTime: 420,
               endTime: 540,
               editable: true,
-              color: "#0000ff",
-              labelText: "My Third Segment"
+              color: "#0000ff"
             }]
           });
 
@@ -126,12 +124,12 @@
           });
 
           $("#inMarker").on("click", function (event) {
-            startTime = peaks.time.getCurrentTime;
+            startTime = peaks.time.getCurrentTime();
             peaks.segments.setInMarker(startTime);
           });
 
           $("#outMarker").on("click", function (event) {
-            endTime = peaks.time.getCurrentTime;
+            endTime = peaks.time.getCurrentTime();
             peaks.segments.setOutMarker(endTime);
           });
 
@@ -140,6 +138,16 @@
             $("#zoomIn").css("opacity", 0.2);
             $("#zoomIn").css("cursor", "not-allowed");
           } 
+
+          $("#segments").on("change", function (event) {
+            if ($("#segments").prop("checked") === false) {
+              $("#segmentText").text("Show Segments");
+              peaks.segments.segmentVisibility(false);
+            } else {
+              $("#segmentText").text("Hide Segments");
+              peaks.segments.segmentVisibility(true);
+            }
+          });
 
         });
 
@@ -153,7 +161,7 @@
         cursor: pointer;
       }
 
-      #titles {
+      #titles, {
         font-family: 'Helvetica neue', Helvetica, Arial, sans-serif;
       }
 
@@ -162,12 +170,30 @@
         width: 1000px;
       }
 
+      #segment-information {
+        margin: 70px auto 24px auto;
+        width:1000px;
+      }
+
+      #segment-information ul {
+        list-style-type: none;
+        padding-left: 10px;
+        padding-bottom: 30px;
+        padding-top: 10px;
+        width:500px;
+      }
+
+      #segment-information ul li {
+        float:left;
+        margin-right:30px;
+      }
+
       #demo-controls .controls {
         float:left;
         margin-right:20px;
       }
 
-      #demo-controls #button-controls #zoomIn, #demo-controls #button-controls #zoomOut, #demo-controls #marker-controls #inMarker,  #demo-controls #marker-controls #outMarker {
+      #demo-controls #button-controls #zoomIn, #demo-controls #button-controls #zoomOut, #demo-controls #marker-controls #inMarker,  #demo-controls #marker-controls #outMarker, #options-controls, #segment-information ul {
         border:2px solid;
         border-radius:5px;
       }
@@ -184,9 +210,6 @@
         -webkit-box-shadow: 3px 3px 20px #919191;
         box-shadow: 3px 3px 20px #919191;
       }
-
-
-
     </style>
 
   </head>
@@ -226,6 +249,12 @@
           <input id="outMarker" type="image" src="images/out_marker_button.png" alt="Out Marker" width="30" height="29" vspace="0" data-namespace="" data-method="">
         </div>
 
+        <div id="options-controls" class="controls" style="padding:5px">
+          <input id="segments" type="checkbox" checked><label id="segmentText" for="segments">Hide Segments</label>
+          <input id="speakers" type="checkbox">Show Speakers
+          <input id="keywords" type="checkbox" checked>Hide Keywords
+        </div>
+
         <!--<ul id="controls">
           <li><button data-namespace="zoom" data-method="zoomIn">zoom in</button></li>
           <li><button data-namespace="zoom" data-method="zoomOut">zoom out</button></li>
@@ -235,7 +264,12 @@
         <button id="segs">Log Segments</button>-->
       </div>
 
-
-
+      <!--<div id="segment-information">
+        <ul>
+          <li><label id="startTime">Segment Start:100</label></li>
+          <li><label id="endTime">Segment End:100</label></li>
+          <li><label id="duration">Segment Duration:100</label></li>
+        </ul>
+      </div>-->
   </body>
 </html>
