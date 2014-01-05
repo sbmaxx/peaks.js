@@ -77,16 +77,16 @@
             event.preventDefault();
             //Don't know if I like the alert? Is the grey fade out of buttons enough to give users indication that you cannot zoom in or out anymore?
 
-            if ($(this).data("method") == "zoomIn" && $(this).attr("disable") == "true") {
+            if ($(this).data("method") === "zoomIn" && $(this).attr("disable") === "true") {
               alert("Cannot Zoom In");
+            } else if ($(this).data("method") === "zoomOut" && $(this).attr("disable") === "true") {
+              alert("Cannot Zoom Out"); 
+            } else {
+              peaks[$(this).data("namespace")][$(this).data("method")]();
             }
-            if ($(this).data("method") == "zoomOut" && $(this).attr("disable") == "true") {
-              alert("Cannot Zoom Out");
-            }
-            peaks[$(this).data("namespace")][$(this).data("method")]();
           });
 
-          $("#button-controls").find("input").on("mouseover", function (event) {
+          /*$("#button-controls").find("input").on("mouseover", function (event) {
             event.preventDefault();
             peaks[$(this).data("namespace")]["showZoomFeedback"]();
           });
@@ -104,9 +104,9 @@
           $("#slider-controls").find("input").on("mouseout", function (event) {
             event.preventDefault();
             peaks[$(this).data("namespace")]["hideZoomFeedback"]();
-          });
+          });*/
 
-          //This allows the user to not have to step on the slider controls to change zoom but it is very laggy so needs to be improved? 
+          //This allows the user to not have to step on the slider controls to change zoom but it is very laggy so needs to be improved? Replaced by mouse scrolling which gives the user the same functionality 
           $("#slider-controls").find("input").on("change", function (event) {
             event.preventDefault();
             peaks[$(this).data("namespace")][$(this).data("method")]($(this).val());
@@ -149,6 +149,16 @@
             }
           });
 
+          $("#genders").on("change", function (event) {
+            if ($("#genders").prop("checked") === false) {
+              $("#genderText").text("Show Genders");
+              peaks.segments.genderVisibility(false);
+            } else {
+              $("#genderText").text("Hide Genders");
+              peaks.segments.genderVisibility(true);
+            }
+          });
+
         });
 
       });
@@ -158,7 +168,7 @@
     <style>
 
       #body {
-        cursor: pointer;
+        cursor: default-pointer;
       }
 
       #titles, {
@@ -186,6 +196,15 @@
       #segment-information ul li {
         float:left;
         margin-right:30px;
+      }
+
+      #speaker-information {
+        float:left;
+      }
+
+      #speaker {
+        margin-top:5px;
+        margin-bottom: 5px;
       }
 
       #demo-controls .controls {
@@ -251,7 +270,7 @@
 
         <div id="options-controls" class="controls" style="padding:5px">
           <input id="segments" type="checkbox" checked><label id="segmentText" for="segments">Hide Segments</label>
-          <input id="speakers" type="checkbox">Show Speakers
+          <input id="genders" type="checkbox"><label id="genderText" for="genders">Show Genders</label>
           <input id="keywords" type="checkbox" checked>Hide Keywords
         </div>
 
@@ -262,6 +281,10 @@
 
         <!--<button id="segment" class="controls" style="margin-top:5px;">10 second segment ...</button>
         <button id="segs">Log Segments</button>-->
+      </div>
+
+      <div id="speaker-information">
+        <div id="speaker"></div>
       </div>
 
       <!--<div id="segment-information">
