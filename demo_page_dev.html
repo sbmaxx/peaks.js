@@ -52,6 +52,7 @@
             audioElement: document.getElementById('audio'),
             dataUri: '/test_data/20131119_210000_bbcr4_all_in_the_mind.dat',
             segmentationData: '/test_information_data/20131119_210000_bbcr4_all_in_the_mind_segmentation.json',
+            keywordsData: '/test_information_data/20131119_210000_bbcr4_all_in_the_mind_tags.json',
             keyboard: true,
             height: 240,
             segments: [{
@@ -151,11 +152,21 @@
 
           $("#genders").on("change", function (event) {
             if ($("#genders").prop("checked") === false) {
-              $("#genderText").text("Show Genders");
+              $("#genderText").text("Show Speakers");
               peaks.segments.genderVisibility(false);
             } else {
-              $("#genderText").text("Hide Genders");
+              $("#genderText").text("Hide Speakers");
               peaks.segments.genderVisibility(true);
+            }
+          });
+
+          $("#keywords").on("change", function (event) {
+            if ($("#keywords").prop("checked") === false) {
+              $("#keywordText").text("Show Keywords");
+              peaks.segments.keywordVisibility(false);
+            } else {
+              $("#keywordText").text("Hide Keywords");
+              peaks.segments.keywordVisibility(true);
             }
           });
 
@@ -180,22 +191,9 @@
         width: 1000px;
       }
 
-      #segment-information {
+      #keyword-information {
         margin: 70px auto 24px auto;
         width:1000px;
-      }
-
-      #segment-information ul {
-        list-style-type: none;
-        padding-left: 10px;
-        padding-bottom: 30px;
-        padding-top: 10px;
-        width:500px;
-      }
-
-      #segment-information ul li {
-        float:left;
-        margin-right:30px;
       }
 
       #speaker-information {
@@ -270,8 +268,8 @@
 
         <div id="options-controls" class="controls" style="padding:5px">
           <input id="segments" type="checkbox" checked><label id="segmentText" for="segments">Hide Segments</label>
-          <input id="genders" type="checkbox"><label id="genderText" for="genders">Show Genders</label>
-          <input id="keywords" type="checkbox" checked>Hide Keywords
+          <input id="genders" type="checkbox" checked><label id="genderText" for="genders">Hide Speakers</label>
+          <input id="keywords" type="checkbox" checked><label id="keywordText" for="keywords">Hide Keywords</label>
         </div>
 
         <!--<ul id="controls">
@@ -285,6 +283,10 @@
 
       <div id="speaker-information">
         <div id="speaker"></div>
+      </div>
+
+      <div id="keyword-information">
+        <div id="keyword"></div>
       </div>
 
       <!--<div id="segment-information">
