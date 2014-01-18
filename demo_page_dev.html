@@ -161,6 +161,7 @@
               $("#outMarker").removeAttr("disabled");
               $("#inMarker").css("opacity", 1);
               $("#outMarker").css("opacity", 1);
+              $("#genders").attr("disabled", "disabled");
             } else {
               peaks.segments.makeSegment(true);
               $("#drag").css("opacity", 1);
@@ -168,6 +169,7 @@
               $("#outMarker").attr("disabled", "disabled");
               $("#inMarker").css("opacity", 0.2);
               $("#outMarker").css("opacity", 0.2);
+              $("#genders").removeAttr("disabled");
             }
           });
         });
