@@ -55,7 +55,7 @@
             keywordsData: '/test_information_data/20131119_210000_bbcr4_all_in_the_mind_tags.json',
             keyboard: true,
             height: 240,
-            segments: [{
+            /*segments: [{
               startTime: 120,
               endTime: 140,
               editable: true,
@@ -66,7 +66,7 @@
               endTime: 540,
               editable: true,
               color: "#0000ff"
-            }]
+            }]*/
           });
 
           $("#controls").find("button").on("click", function (event) {
@@ -113,17 +113,6 @@
             peaks[$(this).data("namespace")][$(this).data("method")]($(this).val());
           });
 
-          $("#segment").on("click", function (event) {
-            startTime = peaks.time.getCurrentTime();
-            endTime = startTime + 10;
-            segmentEditable = true;
-            peaks.segments.addSegment(startTime, endTime, segmentEditable);
-          });
-
-          $("#segs").on("click", function (event) {
-            console.log(peaks.segments.getSegments());
-          });
-
           $("#inMarker").on("click", function (event) {
             startTime = peaks.time.getCurrentTime();
             peaks.segments.setInMarker(startTime);
@@ -133,12 +122,6 @@
             endTime = peaks.time.getCurrentTime();
             peaks.segments.setOutMarker(endTime);
           });
-
-          if (peaks.currentZoomLevel == 0) {
-            $("#zoomIn").attr("disable", "true");
-            $("#zoomIn").css("opacity", 0.2);
-            $("#zoomIn").css("cursor", "not-allowed");
-          } 
 
           $("#segments").on("change", function (event) {
             if ($("#segments").prop("checked") === false) {
@@ -170,6 +153,23 @@
             }
           });
 
+          $("#drag").on("click", function (event) {
+            if ($("#inMarker").attr("disabled") === "disabled") {
+              peaks.segments.makeSegment(false);
+              $("#drag").css("opacity", 0.2);
+              $("#inMarker").removeAttr("disabled");
+              $("#outMarker").removeAttr("disabled");
+              $("#inMarker").css("opacity", 1);
+              $("#outMarker").css("opacity", 1);
+            } else {
+              peaks.segments.makeSegment(true);
+              $("#drag").css("opacity", 1);
+              $("#inMarker").attr("disabled", "disabled");
+              $("#outMarker").attr("disabled", "disabled");
+              $("#inMarker").css("opacity", 0.2);
+              $("#outMarker").css("opacity", 0.2);
+            }
+          });
         });
 
       });
@@ -178,31 +178,52 @@
 
     <style>
 
+      @font-face {
+        font-family: "Aaargh";
+        src: url(/fonts/Aaargh/Aaargh.ttf);
+      }
+
+      * {
+        font-family: "Aaargh";
+        font-size: 12px;
+      }
+
       #body {
         cursor: default-pointer;
       }
 
-      #titles, {
-        font-family: 'Helvetica neue', Helvetica, Arial, sans-serif;
-      }
-
       #demo-controls {
-        margin: 0 auto 24px auto;
+        margin: 24px auto 24px auto;
         width: 1000px;
+        height:auto;
+        overflow:auto;
       }
 
-      #keyword-information {
-        margin: 70px auto 24px auto;
-        width:1000px;
-      }
-
-      #speaker-information {
+      #segment-information {
+        margin: auto auto auto 132px;
         float:left;
       }
 
+      #segment-information .timeLabel {
+        padding-right: 5px;
+      }
+
+      #segment-information .time {
+        padding-left: 5px;
+        padding-right: 5px;
+        margin-right: 5px;
+        border:2px solid;
+        background:#dddddd;
+        box-shadow: 1px 2px 5px #888888;
+      }
+
+      #speaker-information {
+        float:right;
+        margin:auto 132px auto 50px;
+      }
+
       #speaker {
-        margin-top:5px;
-        margin-bottom: 5px;
+        margin:5px 5px 5px 5px;
       }
 
       #demo-controls .controls {
@@ -210,12 +231,17 @@
         margin-right:20px;
       }
 
-      #demo-controls #button-controls #zoomIn, #demo-controls #button-controls #zoomOut, #demo-controls #marker-controls #inMarker,  #demo-controls #marker-controls #outMarker, #options-controls, #segment-information ul {
-        border:2px solid;
-        border-radius:5px;
+      #marker-controls #inMarker, #marker-controls #outMarker {
+        opacity: 0.2;
       }
 
-      #titles, #waveform-visualiser-container {
+      #demo-controls #button-controls #zoomIn, #demo-controls #button-controls #zoomOut, #demo-controls #marker-controls #inMarker,  #marker-controls #drag, #demo-controls #marker-controls #outMarker, #demo-controls #button-controls #overview, #demo-controls #button-controls #selection, #options-controls {
+        border:2px solid;
+        border-radius:5px;
+        box-shadow: 1px 2px 5px #888888;
+      }
+
+      #waveform-visualiser-container {
         margin: 24px auto;
         width: 1000px;
       }
@@ -231,19 +257,6 @@
 
   </head>
   <body>
-      <!--<div id="titles">
-        <h1>Peaks.js Demo Page</h1>
-
-        <p>Peaks is a modular frontend component designed for the display of and interaction with audio waveform material in the browser.</p>
-
-        <p>Peaks was developed by <a href="http://www.bbc.co.uk/rd">BBC R&amp;D</a> to allow users to make accurate clippings of audio data over a timeline in browser by leveraging a backend API for encoding.</p>
-
-        <p>Peaks utilizes HTML5 canvas technology to display waveform data at different zoom levels and provides some basic convenience methods for interacting with waveforms and creating time-based visual sections for denoting content to be clipped or for reference eg: distinguishing music from speech or identifying different music tracks.</p>
-      </div>-->
-
-      <div id="waveform-visualiser-container">
-
-      </div>
 
       <div id="demo-controls">
         <audio id="audio" class="controls" controls=controls>
@@ -257,13 +270,16 @@
         </div>-->
 
         <div id="button-controls" class="controls">
-          <input id="zoomIn" type="image" src="images/zoom_in_button.png" alt="Zoom In" width="30" height="29" vspace="0" data-namespace="zoom" data-method="zoomIn">
-          <input id="zoomOut" type="image" src="images/zoom_out_button.png" alt="Zoom Out" width="30" height="29" vspace="0" data-namespace="zoom" data-method="zoomOut">
+          <input id="zoomIn" type="image" src="images/zoom_in_button.png" alt="Zoom In" width="30" height="29" vspace="0" data-namespace="zoom" data-method="zoomIn" title="Zoom In">
+          <input id="zoomOut" type="image" src="images/zoom_out_button.png" alt="Zoom Out" width="30" height="29" vspace="0" data-namespace="zoom" data-method="zoomOut" title="Zoom Out">
+          <input id="overview" type="image" src="images/overview_button.png" alt="Fit Overview" width="30" height="29" vspace="0" data-namespace="zoom" data-method="overview" title="Fit Overview">
+          <input id="selection" type="image" src="images/selection_button.png" alt="Fit Selection" width="30" height="29" vspace="0" data-namespace="zoom" data-method="selection" title="Fit Selection">
         </div>
 
         <div id="marker-controls" class="controls">
-          <input id="inMarker" type="image" src="images/in_marker_button.png" alt="In Marker" width="30" height="29" vspace="0" data-namespace="" data-method="">
-          <input id="outMarker" type="image" src="images/out_marker_button.png" alt="Out Marker" width="30" height="29" vspace="0" data-namespace="" data-method="">
+          <input id="drag" type="image" src="images/scissors.png" alt="Segment" width="30" height="29" vspace="0" data-namespace="" data-method="" title="Make Segment Selection">
+          <input id="inMarker" type="image" src="images/in_marker_button.png" alt="In Marker" width="30" height="29" vspace="0" data-namespace="" data-method="" title="Set In Marker" disabled>
+          <input id="outMarker" type="image" src="images/out_marker_button.png" alt="Out Marker" width="30" height="29" vspace="0" data-namespace="" data-method="" title="Set Out Marker" disabled>
         </div>
 
         <div id="options-controls" class="controls" style="padding:5px">
@@ -281,20 +297,18 @@
         <button id="segs">Log Segments</button>-->
       </div>
 
+      <div id="waveform-visualiser-container">
+
+      </div>
+
       <div id="speaker-information">
         <div id="speaker"></div>
       </div>
 
-      <div id="keyword-information">
-        <div id="keyword"></div>
+      <div id="segment-information">
+        <label class="timeLabel" id="start">Start: </label><label class="time" id="startTime">0:00</label>
+        <label class="timeLabel" id="end">End: </label><label class="time" id="endTime">0:00</label>
+        <label class="timeLabel" id="duration">Duration: </label><label class="time" id="durationTime">0:00</label>
       </div>
-
-      <!--<div id="segment-information">
-        <ul>
-          <li><label id="startTime">Segment Start:100</label></li>
-          <li><label id="endTime">Segment End:100</label></li>
-          <li><label id="duration">Segment Duration:100</label></li>
-        </ul>
-      </div>-->
   </body>
 </html>
