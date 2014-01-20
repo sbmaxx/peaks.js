@@ -69,6 +69,18 @@
             }]*/
           });
 
+          /*$("#dialog").dialog({
+            autoOpen: false,
+            show: {
+              effect: "blind",
+              duration: 500
+            },
+            hide: {
+              effect: "blind",
+              duration: 500
+            }
+          });*/
+
           $("#controls").find("button").on("click", function (event) {
             event.preventDefault();
             peaks[$(this).data("namespace")][$(this).data("method")]();
@@ -76,41 +88,27 @@
 
           $("#button-controls").find("input").on("click", function (event) {
             event.preventDefault();
-            //Don't know if I like the alert? Is the grey fade out of buttons enough to give users indication that you cannot zoom in or out anymore?
-
+            //Don't know if I like the alert? Is the grey fade out of buttons enough to give users indication that you cannot zoom in or out anymore? - Other option would be to display error on the page but not disabling the use of the page
             if ($(this).data("method") === "zoomIn" && $(this).attr("disable") === "true") {
-              alert("Cannot Zoom In");
+              /*$("#dialogText").text("Oh no! Lowest zoom level reached. Cannot zoom in any further.");
+              $("#dialog").dialog("open");*/
+              $("#alert").text("Oh no! Lowest zoom level reached. Cannot zoom in any further.");
+              if ($("#alert").hasClass("hidden")) {
+                $("#alert").removeClass("hidden").addClass("visible");
+              }
             } else if ($(this).data("method") === "zoomOut" && $(this).attr("disable") === "true") {
-              alert("Cannot Zoom Out"); 
+              /*$("#dialogText").text("Oh no! Highest zoom level reached. Cannot zoom out any further.");
+              $("#dialog").dialog("open");*/
+              $("#alert").text("Oh no! Highest zoom level reached. Cannot zoom out any further.");
+              if ($("#alert").hasClass("hidden")) {
+                $("#alert").removeClass("hidden").addClass("visible");
+              }
             } else {
+              if ($("#alert").hasClass("visible")) {
+                $("#alert").removeClass("visible").addClass("hidden");
+              }
               peaks[$(this).data("namespace")][$(this).data("method")]();
             }
-          });
-
-          /*$("#button-controls").find("input").on("mouseover", function (event) {
-            event.preventDefault();
-            peaks[$(this).data("namespace")]["showZoomFeedback"]();
-          });
-
-          $("#button-controls").find("input").on("mouseout", function (event) {
-            event.preventDefault();
-            peaks[$(this).data("namespace")]["hideZoomFeedback"]();
-          });
-
-          $("#slider-controls").find("input").on("mouseover", function (event) {
-            event.preventDefault();
-            peaks[$(this).data("namespace")]["showZoomFeedback"]();
-          });
-
-          $("#slider-controls").find("input").on("mouseout", function (event) {
-            event.preventDefault();
-            peaks[$(this).data("namespace")]["hideZoomFeedback"]();
-          });*/
-
-          //This allows the user to not have to step on the slider controls to change zoom but it is very laggy so needs to be improved? Replaced by mouse scrolling which gives the user the same functionality 
-          $("#slider-controls").find("input").on("change", function (event) {
-            event.preventDefault();
-            peaks[$(this).data("namespace")][$(this).data("method")]($(this).val());
           });
 
           $("#inMarker").on("click", function (event) {
@@ -118,9 +116,17 @@
             peaks.segments.setInMarker(startTime);
           });
 
+          $("#inMarker").on("mouseover", function (event) {
+            $("#inMarker").css("cursor", "pointer");
+          });
+
           $("#outMarker").on("click", function (event) {
             endTime = peaks.time.getCurrentTime();
             peaks.segments.setOutMarker(endTime);
+          });
+
+          $("#outMarker").on("mouseover", function (event) {
+            $("#outMarker").css("cursor", "pointer");
           });
 
           $("#segments").on("change", function (event) {
@@ -167,8 +173,14 @@
               $("#drag").css("opacity", 1);
               $("#inMarker").attr("disabled", "disabled");
               $("#outMarker").attr("disabled", "disabled");
-              $("#inMarker").css("opacity", 0.2);
-              $("#outMarker").css("opacity", 0.2);
+              $("#inMarker").css({
+                "opacity" : "0.2",
+                "cursor" : "not-allowed",
+              })
+              $("#outMarker").css({
+                "opacity" : "0.2",
+                "cursor" : "not-allowed",
+              })
               $("#genders").removeAttr("disabled");
             }
           });
@@ -235,6 +247,11 @@
 
       #marker-controls #inMarker, #marker-controls #outMarker {
         opacity: 0.2;
+        cursor: not-allowed;
+      }
+
+      #marker-controls #drag {
+        opacity: 1;
       }
 
       #demo-controls #button-controls #zoomIn, #demo-controls #button-controls #zoomOut, #demo-controls #marker-controls #inMarker,  #marker-controls #drag, #demo-controls #marker-controls #outMarker, #demo-controls #button-controls #overview, #demo-controls #button-controls #selection, #options-controls {
@@ -254,6 +271,28 @@
         -moz-box-shadow: 3px 3px 20px #919191;
         -webkit-box-shadow: 3px 3px 20px #919191;
         box-shadow: 3px 3px 20px #919191;
+      }
+
+      #alert {
+        padding: 8px 35px 8px 14px;
+        margin: 60px 132px auto 132px;
+        text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+        background-color: #fcf8e3;
+        border: 1px solid #fbeed5;
+        -webkit-border-radius: 4px;
+        -moz-border-radius: 4px;
+        border-radius: 4px;
+        background-color: #f2dede;
+        border-color: #eed3d7;
+        color: #b94a48;
+      }
+
+      .hidden {
+        display: none;
+      }
+
+      .visible {
+        display: block;
       }
     </style>
 
@@ -275,7 +314,7 @@
           <input id="zoomIn" type="image" src="images/zoom_in_button.png" alt="Zoom In" width="30" height="29" vspace="0" data-namespace="zoom" data-method="zoomIn" title="Zoom In">
           <input id="zoomOut" type="image" src="images/zoom_out_button.png" alt="Zoom Out" width="30" height="29" vspace="0" data-namespace="zoom" data-method="zoomOut" title="Zoom Out">
           <input id="overview" type="image" src="images/overview_button.png" alt="Fit Overview" width="30" height="29" vspace="0" data-namespace="zoom" data-method="overview" title="Fit Overview">
-          <input id="selection" type="image" src="images/selection_button.png" alt="Fit Selection" width="30" height="29" vspace="0" data-namespace="zoom" data-method="selection" title="Fit Selection">
+          <input id="selection" type="image" src="images/play_selection_button.png" alt="Fit Selection" width="30" height="29" vspace="0" data-namespace="zoom" data-method="selection" title="Play Last Segment">
         </div>
 
         <div id="marker-controls" class="controls">
@@ -311,6 +350,9 @@
         <label class="timeLabel" id="start">Start: </label><label class="time" id="startTime">0:00</label>
         <label class="timeLabel" id="end">End: </label><label class="time" id="endTime">0:00</label>
         <label class="timeLabel" id="duration">Duration: </label><label class="time" id="durationTime">0:00</label>
+      </div>
+
+      <div id="alert" class="hidden">
       </div>
   </body>
 </html>
