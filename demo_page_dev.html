@@ -51,9 +51,9 @@
             container: document.getElementById('waveform-visualiser-container'),
             audioElement: document.getElementById('audio'),
             dataUri: '/test_data/20131119_210000_bbcr4_all_in_the_mind.dat',
-            //segmentationData: '/test_information_data/20131119_210000_bbcr4_all_in_the_mind_segmentation.json',
+            segmentationData: '/test_information_data/20131119_210000_bbcr4_all_in_the_mind_segmentation.json',
             tagsData: '/test_information_data/20131119_210000_bbcr4_all_in_the_mind_tags.json',
-            //keywordsData: '/test_information_data/20131119_210000_bbcr4_all_in_the_mind_keywords.json',
+            keywordsData: '/test_information_data/20131119_210000_bbcr4_all_in_the_mind_keywords.json',
             keyboard: true,
             height: 240,
             /*segments: [{
@@ -137,6 +137,36 @@
             }
           });
 
+          $("#dropdown").find("li").on("click", function (event) {
+            event.preventDefault();
+            var n = this.value;
+            switch(Number(n)) {
+              case 1:
+                peaks.segments.genderVisibility(true);
+                peaks.segments.keywordVisibility(false);
+                peaks.segments.tagVisibility(false);
+                $("#data-overlays-bar").trigger("click");
+                $("#data-overlays-bar").text($(this).text());
+                break;
+              case 2:
+                peaks.segments.genderVisibility(false);
+                peaks.segments.keywordVisibility(true);
+                peaks.segments.tagVisibility(false);
+                $("#data-overlays-bar").trigger("click");
+                $("#data-overlays-bar").text($(this).text());
+                break;
+              case 3:
+                peaks.segments.genderVisibility(false);
+                peaks.segments.keywordVisibility(false);
+                peaks.segments.tagVisibility(true);
+                $("#data-overlays-bar").trigger("click");
+                $("#data-overlays-bar").text($(this).text());
+                break;
+              default:
+                console.log("No Case Defined");
+            }
+          });
+
           $("#timing").find("select").on("change", function (event) {
             event.preventDefault();
             var n = this.value;
@@ -157,6 +187,10 @@
 
           $("#options_bar").click(function(){
             $("#options").slideToggle("slow");
+          });
+
+          $("#data-overlays-bar").click(function(){
+            $("#data-overlays-list").slideToggle("slow");
           });
         });
       });
@@ -333,6 +367,51 @@
       #options ul li {
         padding:5px;
       }
+
+      #data-overlays-bar {
+        text-align: center;
+        width:120px;
+        opacity:1;
+        box-shadow: 1px 2px 5px #888888;
+        padding: 5px 25px 5px 25px;
+        margin-right: 5px;
+        background: #EFEFEF url(/images/dropDownArrow.png) no-repeat right;
+        margin-top:3px;
+        cursor: pointer;
+      }
+
+      #data-overlays-list {
+        position:absolute;
+        display:none;
+        width:120px;
+        opacity:1;
+        background-color:#bebdbd;
+        padding: 5px 25px 5px 25px;
+        margin-right: 5px;
+        z-index:9999;
+        cursor:pointer;
+      }
+
+      #data-overlays-list ul {
+        list-style-type:none;
+        padding-left: 0px;
+      }
+
+      #data-overlays-list ul li {
+        padding:5px 1px 5px 1px;
+        border-bottom: 1px solid #e6e8ea;
+        text-align: center;
+        transition: all 0.3s ease-out;
+      }
+
+      #data-overlays-list ul .active:hover {
+        color: white;
+      }
+
+      #data-overlays-list ul .deactive {
+        color: black;
+        opacity: 0.2;
+      }
     </style>
 
   </head>
@@ -392,13 +471,27 @@
             <input id="playSegment" type="image" src="images/play_selection_button.png" alt="Play Last Segment" width="30" height="29" vspace="0" data-namespace="segments" data-method="selection" title="Play Last Segment" disabled>
           </div>
 
-          <div id="options-controls" class="controls" style="padding:10px; margin-right:0px">
+          <!--<div id="options-controls" class="controls" style="padding:10px; margin-right:0px">
             <input id="Segments" type="checkbox" value="1" checked>
               <label id="segmentText" for="Segments">Segments</label>
             <input id="Genders" type="checkbox" value="2" checked>
               <label id="genderText" for="Genders">Speakers</label>
             <input id="Keywords" type="checkbox" value="3" checked>
               <label id="keywordText" for="Keywords">Keywords</label>
+          </div>-->
+          <div id="options-controls" class="controls" style="padding:8px; margin-right:0px">
+            <input id="Segments" type="checkbox" value="1" checked>
+              <label id="segmentText" for="Segments">Segments</label>
+          </div>
+          <div id="data-overlays" class="controls" style="margin-right:0px">
+            <div id="data-overlays-bar">Information Data</div>
+            <div id="data-overlays-list">
+              <ul id="dropdown">
+                <li value="1" id="speaker_text" class="active">Speakers</li>
+                <li value="2" id="keywords_text" class="active">Keywords</li>
+                <li value="3" id="topics_text" class="active">Topics</li>
+              </ul>
+            </div>
           </div>
         </div>
 
