@@ -51,8 +51,8 @@
             container: document.getElementById('waveform-visualiser-container'),
             audioElement: document.getElementById('audio'),
             dataUri: '/test_data/20131119_210000_bbcr4_all_in_the_mind.dat',
-            segmentationData: '/test_information_data/20131119_210000_bbcr4_all_in_the_mind_segmentation.json',
-            //tagsData: '/test_information_data/20131119_210000_bbcr4_all_in_the_mind_tags.json',
+            //segmentationData: '/test_information_data/20131119_210000_bbcr4_all_in_the_mind_segmentation.json',
+            tagsData: '/test_information_data/20131119_210000_bbcr4_all_in_the_mind_tags.json',
             //keywordsData: '/test_information_data/20131119_210000_bbcr4_all_in_the_mind_keywords.json',
             keyboard: true,
             height: 240,
@@ -136,6 +136,28 @@
                 console.log("No Case Defined");
             }
           });
+
+          $("#timing").find("select").on("change", function (event) {
+            event.preventDefault();
+            var n = this.value;
+            peaks.option.changeTiming(n);
+          });
+
+          $("#speaker-name").find("select").on("change", function (event) {
+            event.preventDefault();
+            var n = this.value;
+            peaks.option.changeSpeakerName(n);
+          });
+
+          $("#speakers").find("select").on("change", function (event) {
+            event.preventDefault();
+            var n = this.value;
+            peaks.option.changeSpeakerDisplay(n);
+          });
+
+          $("#options_bar").click(function(){
+            $("#options").slideToggle("slow");
+          });
         });
       });
 
@@ -164,7 +186,6 @@
 
       #inner_wrapper{
         padding-bottom: 20px;
-        background-color: #f8f8f0;
         overflow: auto;
         margin: 30px 132px 30px 132px;
       }
@@ -177,7 +198,7 @@
       }
 
       #segment-information {
-        margin: auto auto 20px 132px;
+        margin: auto auto 20px auto;
         padding-left: 2px;
         float:left;
       }
@@ -197,7 +218,7 @@
 
       #speaker-information {
         float:right;
-        margin:auto 132px auto 50px;
+        margin:auto auto auto 50px;
         background-color: #FFF;
       }
 
@@ -267,7 +288,7 @@
 
       #alert {
         padding: 8px 35px 8px 14px;
-        margin: 80px 132px auto 132px;
+        margin: 80px auto auto auto;
         text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
         background-color: #fcf8e3;
         border: 1px solid #fbeed5;
@@ -286,12 +307,70 @@
       .visible {
         display: block;
       }
+
+      #implementation_options {
+        margin: auto 132px auto 132px;
+      }
+
+      #options_bar,#options
+      {
+        padding:5px;
+        text-align:center;
+        color:white;
+        background-color:#aaa;
+        border:solid 1px #c3c3c3;
+        opacity:0.8;
+      }
+
+      #options {
+        display:none;
+      }
+
+      #options ul {
+        list-style-type: none;
+      }
+
+      #options ul li {
+        padding:5px;
+      }
     </style>
 
   </head>
   <body>
-    <!--<div id="outer_wrapper">
-      <div id="inner_wrapper">-->
+    <!--<div id="outer_wrapper">-->
+      <div id="implementation_options">
+        <div id="options_bar">Click to Show/Hide Options</div>
+        <div id="options">
+          <ul>
+            <li id="timing">
+              <label>Axis Labelling</label>
+              <select>
+                <option value="1">1:14:40 Format</option>
+                <option value="2" selected>1h 14m 40s Format</option>
+              </select>
+            </li>
+
+            <li id="speakers">
+              <label>Speaker Data Overlay</label>
+              <select>
+                <option value="1">Speaker Coloured by Name [Always Visible]</option>
+                <option value="2">Speaker Coloured by Gender [Always Visible]</option>
+                <option value="3">Speaker Coloured by Gender [Visible on Hover]</option>
+              </select>
+            </li>
+
+            <li id="speaker-name">
+              <label>Speaker Name Visibility</label>
+              <select>
+                <option value="1">Speaker Name Bottom Corner</option>
+                <option value="2" selected>Speaker Name Tooltip</option>
+              </select>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div id="inner_wrapper">
 
         <div id="demo-controls">
           <audio id="audio" class="controls" controls=controls>
@@ -339,7 +418,8 @@
 
         <div id="alert" class="hidden">
         </div>
-      <!--</div>
-    </div>-->
+
+      </div>
+    <!--</div>-->
   </body>
 </html>
