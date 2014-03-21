@@ -53,7 +53,7 @@
             dataUri: '/test_data/20131119_210000_bbcr4_all_in_the_mind.dat',
             segmentationData: '/test_information_data/20131119_210000_bbcr4_all_in_the_mind_segmentation.json',
             tagsData: '/test_information_data/20131119_210000_bbcr4_all_in_the_mind_tags.json',
-            keywordsData: '/test_information_data/20131119_210000_bbcr4_all_in_the_mind_keywords.json',
+            keywordsData: '/test_information_data/keywords.json',
             keyboard: true,
             height: 240,
             /*segments: [{
@@ -162,6 +162,13 @@
                 $("#data-overlays-bar").trigger("click");
                 $("#data-overlays-bar").text($(this).text());
                 break;
+              case 4:
+                peaks.segments.genderVisibility(false);
+                peaks.segments.keywordVisibility(false);
+                peaks.segments.tagVisibility(false);
+                $("#data-overlays-bar").trigger("click");
+                $("#data-overlays-bar").text($(this).text());
+                break;
               default:
                 console.log("No Case Defined");
             }
@@ -185,6 +192,35 @@
             peaks.option.changeSpeakerDisplay(n);
           });
 
+          $("#data_overlays").find("select").on("change", function (event) {
+            event.preventDefault();
+            var n = this.value;
+            switch(Number(n)) {
+              case 1:
+                peaks.segments.genderVisibility(true);
+                peaks.segments.keywordVisibility(false);
+                peaks.segments.tagVisibility(false);
+                break;
+              case 2:
+                peaks.segments.genderVisibility(false);
+                peaks.segments.keywordVisibility(true);
+                peaks.segments.tagVisibility(false);
+                break;
+              case 3:
+                peaks.segments.genderVisibility(false);
+                peaks.segments.keywordVisibility(false);
+                peaks.segments.tagVisibility(true);
+                break;
+              case 4:
+                peaks.segments.genderVisibility(false);
+                peaks.segments.keywordVisibility(false);
+                peaks.segments.tagVisibility(false);
+                break;
+              default:
+                console.log("No Case Defined");
+            }
+          });
+
           $("#options_bar").click(function(){
             $("#options").slideToggle("slow");
           });
@@ -192,257 +228,54 @@
           $("#data-overlays-bar").click(function(){
             $("#data-overlays-list").slideToggle("slow");
           });
+
+          $("#speakerSearch").on("search", function() {
+            var searchValue = this.value;
+            peaks.search.searchSpeakers(searchValue);
+          });
         });
       });
 
     </script>
 
-    <style>
-
-      @font-face {
-        font-family: "Aaargh";
-        src: url(/fonts/Aaargh/Aaargh.ttf);
-      }
-
-      * {
-        font-family: "Aaargh";
-        font-size: 12px;
-      }
-
-      #body {
-        cursor: default-pointer;
-      }
-
-      #outer_wrapper {
-        background-color: #e6e2d6;
-        overflow: auto;
-      }
-
-      #inner_wrapper{
-        padding-bottom: 20px;
-        overflow: auto;
-        margin: 30px 132px 30px 132px;
-      }
-
-      #demo-controls {
-        margin: 24px auto 24px auto;
-        width: 1000px;
-        height:auto;
-        overflow:auto;
-      }
-
-      #segment-information {
-        margin: auto auto 20px auto;
-        padding-left: 2px;
-        float:left;
-      }
-
-      #segment-information .timeLabel {
-        padding-right: 5px;
-      }
-
-      #segment-information .time {
-        padding-left: 5px;
-        padding-right: 5px;
-        margin-right: 5px;
-        border:2px solid;
-        background:#dddddd;
-        box-shadow: 1px 2px 5px #888888;
-      }
-
-      #speaker-information {
-        float:right;
-        margin:auto auto auto 50px;
-        background-color: #FFF;
-      }
-
-      #speaker {
-        margin:5px 5px 5px 5px;
-      }
-
-      #demo-controls .controls {
-        float:left;
-        margin-right:20px;
-      }
-
-      #marker-controls #inMarker, #marker-controls #outMarker, #marker-controls #playSegment {
-        opacity: 0.2;
-        cursor: not-allowed;
-      }
-
-      #marker-controls #cut {
-        opacity: 1;
-      }
-
-      #options-controls input[type=checkbox] {
-        display:none;
-      }
-
-      #options-controls input[type=checkbox] + label {
-        background-color:#EFEFEF;
-        border-radius:20px;
-        border:1px solid #D0D0D0;
-        box-shadow: 1px 2px 5px #888888;
-        padding: 5px 25px 5px 25px;
-        margin-right: 5px;
-      }
-
-      /*#options-controls #genderText {
-        background:url(/images/speaker_overlay.png);
-        background-size:100px 25px;
-        background-repeat:no-repeat;
-      }*/
-
-      #options-controls input[type=checkbox]:checked + label {
-        background-color:#F0F0F0;
-        color:#3333CC;
-        box-shadow: inset 0 2px 4px rgba(0,0,0,0.15),0 1px 2px rgba(0,0,0,0.05);
-      }
-
-      #demo-controls #button-controls #zoomIn, #demo-controls #button-controls #zoomOut, #demo-controls #marker-controls #inMarker,  #marker-controls #cut, #demo-controls #marker-controls #outMarker, #demo-controls #button-controls #overview, #demo-controls #marker-controls #playSegment {
-        border:2px solid;
-        border-radius:5px;
-        box-shadow: 1px 2px 5px #888888;
-        background-color: #fff;
-      }
-
-      #waveform-visualiser-container {
-        margin: 24px auto;
-        width: 1000px;
-      }
-
-      #waveform-visualiser-container > div > div {
-        margin: 0 0 24px 0;
-        /*height: 240px;*/
-        -moz-box-shadow: 3px 3px 20px #919191;
-        -webkit-box-shadow: 3px 3px 20px #919191;
-        box-shadow: 3px 3px 20px #919191;
-        background-color: #fff;
-      }
-
-      #alert {
-        padding: 8px 35px 8px 14px;
-        margin: 80px auto auto auto;
-        text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
-        background-color: #fcf8e3;
-        border: 1px solid #fbeed5;
-        -webkit-border-radius: 4px;
-        -moz-border-radius: 4px;
-        border-radius: 4px;
-        background-color: #f2dede;
-        border-color: #eed3d7;
-        color: #b94a48;
-      }
-
-      .hidden {
-        display: none;
-      }
-
-      .visible {
-        display: block;
-      }
-
-      #implementation_options {
-        margin: auto 132px auto 132px;
-      }
-
-      #options_bar,#options
-      {
-        padding:5px;
-        text-align:center;
-        color:white;
-        background-color:#aaa;
-        border:solid 1px #c3c3c3;
-        opacity:0.8;
-      }
-
-      #options {
-        display:none;
-      }
-
-      #options ul {
-        list-style-type: none;
-      }
-
-      #options ul li {
-        padding:5px;
-      }
-
-      #data-overlays-bar {
-        text-align: center;
-        width:120px;
-        opacity:1;
-        box-shadow: 1px 2px 5px #888888;
-        padding: 5px 25px 5px 25px;
-        margin-right: 5px;
-        background: #EFEFEF url(/images/dropDownArrow.png) no-repeat right;
-        margin-top:3px;
-        cursor: pointer;
-      }
-
-      #data-overlays-list {
-        position:absolute;
-        display:none;
-        width:120px;
-        opacity:1;
-        background-color:#bebdbd;
-        padding: 5px 25px 5px 25px;
-        margin-right: 5px;
-        z-index:9999;
-        cursor:pointer;
-      }
-
-      #data-overlays-list ul {
-        list-style-type:none;
-        padding-left: 0px;
-      }
-
-      #data-overlays-list ul li {
-        padding:5px 1px 5px 1px;
-        border-bottom: 1px solid #e6e8ea;
-        text-align: center;
-        transition: all 0.3s ease-out;
-      }
-
-      #data-overlays-list ul .active:hover {
-        color: white;
-      }
-
-      #data-overlays-list ul .deactive {
-        color: black;
-        opacity: 0.2;
-      }
-    </style>
-
   </head>
   <body>
     <!--<div id="outer_wrapper">-->
       <div id="implementation_options">
-        <div id="options_bar">Click to Show/Hide Options</div>
+        <!--<div id="options_bar">Click to Show/Hide Options</div>-->
         <div id="options">
           <ul>
-            <li id="timing">
-              <label>Axis Labelling</label>
-              <select>
-                <option value="1">1:14:40 Format</option>
-                <option value="2" selected>1h 14m 40s Format</option>
+            <li id="timing" >
+              <!--<label>Axis Labelling</label>-->
+              <select class="dropdown">
+                <option value="1">Option 1</option> <!--1:14:40 Format-->
+                <option value="2" selected>Option 2</option> <!--1h 14m 40s Format-->
               </select>
             </li>
 
             <li id="speakers">
-              <label>Speaker Data Overlay</label>
-              <select>
-                <option value="1">Speaker Coloured by Name [Always Visible]</option>
-                <option value="2">Speaker Coloured by Gender [Always Visible]</option>
-                <option value="3">Speaker Coloured by Gender [Visible on Hover]</option>
+              <!--<label>Speaker Data Overlay</label>-->
+              <select class="dropdown">
+                <option value="1">Option 1</option><!--Speaker Coloured by Name [Always Visible]-->
+                <option value="3">Option 2</option><!--Speaker Coloured by Gender [Visible on Hover]-->
               </select>
             </li>
 
             <li id="speaker-name">
-              <label>Speaker Name Visibility</label>
-              <select>
-                <option value="1">Speaker Name Bottom Corner</option>
-                <option value="2" selected>Speaker Name Tooltip</option>
+              <!--<label>Speaker Name Visibility</label>-->
+              <select class="dropdown">
+                <option value="1">Option 1</option><!--Speaker Name Bottom Corner-->
+                <option value="2" selected>Option 2</option><!--Speaker Name Tooltip-->
+              </select>
+            </li>
+
+            <li id="data_overlays" >
+              <!--<label>Data Overlays Visibility</label>-->
+              <select class="dropdown">
+                <option value="4" id="waveform_option" class="active">N</option><!--None-->
+                <option value="1" id="speakers_option" class="active">S</option><!--Speakers-->
+                <option value="2" id="keywords_option" class="active">K</option><!--Keywords-->
+                <option value="3" id="topics_option" class="active">T</option><!--Topics-->
               </select>
             </li>
           </ul>
@@ -459,16 +292,16 @@
           </audio>
 
           <div id="button-controls" class="controls">
-            <input id="zoomIn" type="image" src="images/zoom_in_button.png" alt="Zoom In" width="30" height="29" vspace="0" data-namespace="zoom" data-method="zoomIn" title="Zoom In">
-            <input id="zoomOut" type="image" src="images/zoom_out_button.png" alt="Zoom Out" width="30" height="29" vspace="0" data-namespace="zoom" data-method="zoomOut" title="Zoom Out">
-            <input id="overview" type="image" src="images/overview_button.png" alt="Fit Overview" width="30" height="29" vspace="0" data-namespace="zoom" data-method="overview" title="Fit Overview">
+            <input id="zoomIn" type="image" src="/build/images/zoom_in_button.png" alt="Zoom In" width="30" height="29" vspace="0" data-namespace="zoom" data-method="zoomIn" title="Zoom In">
+            <input id="zoomOut" type="image" src="/build/images/zoom_out_button.png" alt="Zoom Out" width="30" height="29" vspace="0" data-namespace="zoom" data-method="zoomOut" title="Zoom Out">
+            <input id="overview" type="image" src="/build/images/overview_button.png" alt="Fit Overview" width="30" height="29" vspace="0" data-namespace="zoom" data-method="overview" title="Fit Overview">
           </div>
 
           <div id="marker-controls" class="controls">
-            <input id="cut" type="image" src="images/scissors.png" alt="Segment" width="30" height="29" vspace="0" data-namespace="segments" data-method="cut_mode" title="Make Segment Selection">
-            <input id="inMarker" type="image" src="images/in_marker_button.png" alt="In Marker" width="30" height="29" vspace="0" data-namespace="segments" data-method="setInMarker" title="Set In Marker" disabled>
-            <input id="outMarker" type="image" src="images/out_marker_button.png" alt="Out Marker" width="30" height="29" vspace="0" data-namespace="segments" data-method="setOutMarker" title="Set Out Marker" disabled>
-            <input id="playSegment" type="image" src="images/play_selection_button.png" alt="Play Last Segment" width="30" height="29" vspace="0" data-namespace="segments" data-method="selection" title="Play Last Segment" disabled>
+            <input id="cut" type="image" src="/build/images/scissors.png" alt="Segment" width="30" height="29" vspace="0" data-namespace="segments" data-method="cut_mode" title="Make Segment Selection">
+            <input id="inMarker" type="image" src="/build/images/in_marker_button.png" alt="In Marker" width="30" height="29" vspace="0" data-namespace="segments" data-method="setInMarker" title="Set In Marker" disabled>
+            <input id="outMarker" type="image" src="/build/images/out_marker_button.png" alt="Out Marker" width="30" height="29" vspace="0" data-namespace="segments" data-method="setOutMarker" title="Set Out Marker" disabled>
+            <input id="playSegment" type="image" src="/build/images/play_selection_button.png" alt="Play Last Segment" width="30" height="29" vspace="0" data-namespace="segments" data-method="selection" title="Play Last Segment" disabled>
           </div>
 
           <!--<div id="options-controls" class="controls" style="padding:10px; margin-right:0px">
@@ -483,15 +316,23 @@
             <input id="Segments" type="checkbox" value="1" checked>
               <label id="segmentText" for="Segments">Segments</label>
           </div>
-          <div id="data-overlays" class="controls" style="margin-right:0px">
-            <div id="data-overlays-bar">Information Data</div>
+
+          <!--<div id="data-overlays" class="controls" style="margin-right:0px">
+            <div id="data-overlays-bar">None</div>
             <div id="data-overlays-list">
               <ul id="dropdown">
+                <li value="4" id="waveform_text" class="active">None</li>
                 <li value="1" id="speaker_text" class="active">Speakers</li>
                 <li value="2" id="keywords_text" class="active">Keywords</li>
                 <li value="3" id="topics_text" class="active">Topics</li>
               </ul>
             </div>
+          </div>-->
+
+          <div id="speaker-search" class="controls" style="margin-right:0px; margin-top:4px; float:right;">
+            <datalist id="speakers_list"> 
+            </datalist>
+            <input type="search" id="speakerSearch" results="5" placeholder="Search Speakers" list="speakers_list" autocomplete="on" style="font-size:16px;">
           </div>
         </div>
 
