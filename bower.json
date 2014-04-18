@@ -18,6 +18,5 @@
     "eventEmitter": "~4.2.1",
     "handlebars": "~1.0.0",
     "waveform-data": "git@github.com:mgrewal1/waveform-data.js.git"
-    //"waveform-data": "git@github.com:bbcrd/waveform-data.js.git"
   }
 }
