@@ -10,8 +10,8 @@ define('peaks', [
     var buildUi = function(container) {
         return {
             'player': container.querySelector(".waveform"),
-            'zoom': container.querySelector(".zoom-container"),
-            'overview': container.querySelector(".overview-container")
+            'zoom': container.querySelector(".waveform__container_zoom"),
+            'overview': container.querySelector(".waveform__container_overview")
         };
     };
 
@@ -117,8 +117,8 @@ define('peaks', [
              */
             template: [
                 '<div class="waveform">',
-                '<div class="zoom-container"></div>',
-                '<div class="overview-container"></div>',
+                '<div class="waveform__container waveform__container_overview"></div>',
+                '<div class="waveform__container waveform__container_zoom"></div>',
                 '</div>'
             ].join(''),
 

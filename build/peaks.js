@@ -56,8 +56,8 @@
 	    var buildUi = function(container) {
 	        return {
 	            'player': container.querySelector(".waveform"),
-	            'zoom': container.querySelector(".zoom-container"),
-	            'overview': container.querySelector(".overview-container")
+	            'zoom': container.querySelector(".waveform__container_zoom"),
+	            'overview': container.querySelector(".waveform__container_overview")
 	        };
 	    };
 
@@ -163,8 +163,8 @@
 	             */
 	            template: [
 	                '<div class="waveform">',
-	                '<div class="zoom-container"></div>',
-	                '<div class="overview-container"></div>',
+	                '<div class="waveform__container waveform__container_overview"></div>',
+	                '<div class="waveform__container waveform__container_zoom"></div>',
 	                '</div>'
 	            ].join(''),
 
@@ -4253,7 +4253,7 @@
 	        // and causes artifacts on the canvas.  As of 02/26/2014, there doesn't seem to be a way
 	        // to reliably calculate the browser zoom for modern browsers, which is why we just set
 	        // the pixel ratio to 1 for desktops
-	        _pixelRatio = Kinetic.UA.mobile ? (function() {
+	        _pixelRatio = (function() {
 	            var devicePixelRatio = window.devicePixelRatio || 1,
 	            backingStoreRatio = context.webkitBackingStorePixelRatio
 	                || context.mozBackingStorePixelRatio
@@ -4262,7 +4262,7 @@
 	                || context.backingStorePixelRatio
 	                || 1;
 	            return devicePixelRatio / backingStoreRatio;
-	        })() : 1;
+	        })();
 
 	    /**
 	     * Canvas Renderer constructor
