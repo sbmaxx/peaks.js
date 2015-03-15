@@ -142,36 +142,36 @@ define([
              * Deal with window resize event over both waveform views.
              */
             bindResize: function() {
-                var that = this;
-
-                window.addEventListener("resize", function() {
-                    that.ui.overview.hidden = true;
-                    that.ui.zoom.hidden = true;
-
-                    if (that.resizeTimeoutId) clearTimeout(that.resizeTimeoutId);
-                    that.resizeTimeoutId = setTimeout(function() {
-                        var w = that.ui.player.clientWidth;
-                        var overviewWaveformData = that.origWaveformData.resample(w);
-                        peaks.emit("resizeEndOverview", w, overviewWaveformData);
-                        peaks.emit("window_resized", w, that.origWaveformData);
-                    }, 500);
-                });
-
-                peaks.on("overview_resized", function() {
-                    that.ui.overview.removeAttribute('hidden');
-                });
-
-                peaks.on("zoomview_resized", function() {
-                    that.ui.zoom.removeAttribute('hidden');
-                });
-
-                peaks.on("user_seek.*", function(time) {
-                    peaks.player.seekBySeconds(time);
-                });
-
-                peaks.on("user_scrub.*", function(time) {
-                    peaks.player.seekBySeconds(time);
-                });
+                // var that = this;
+                //
+                // window.addEventListener("resize", function() {
+                //     that.ui.overview.hidden = true;
+                //     that.ui.zoom.hidden = true;
+                //
+                //     if (that.resizeTimeoutId) clearTimeout(that.resizeTimeoutId);
+                //     that.resizeTimeoutId = setTimeout(function() {
+                //         var w = that.ui.player.clientWidth;
+                //         var overviewWaveformData = that.origWaveformData.resample(w);
+                //         peaks.emit("resizeEndOverview", w, overviewWaveformData);
+                //         peaks.emit("window_resized", w, that.origWaveformData);
+                //     }, 500);
+                // });
+                //
+                // peaks.on("overview_resized", function() {
+                //     that.ui.overview.removeAttribute('hidden');
+                // });
+                //
+                // peaks.on("zoomview_resized", function() {
+                //     that.ui.zoom.removeAttribute('hidden');
+                // });
+                //
+                // peaks.on("user_seek.*", function(time) {
+                //     peaks.player.seekBySeconds(time);
+                // });
+                //
+                // peaks.on("user_scrub.*", function(time) {
+                //     peaks.player.seekBySeconds(time);
+                // });
             }
         };
     };
