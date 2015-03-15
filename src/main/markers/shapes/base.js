@@ -4,21 +4,21 @@
  * This module handles all functionality related to the adding,
  * removing and manipulation of segments
  */
-define(function () {
-  'use strict';
+define(function() {
+    'use strict';
 
-  function BaseShape(){}
+    function BaseShape() {}
 
-  function noop(){}
+    function noop() {}
 
-  function throwUndefined(){
-    throw new Error('You should extend this method in your parent class.');
-  }
+    function throwUndefined() {
+        throw new Error('You should extend this method in your parent class.');
+    }
 
-  BaseShape.prototype = {
-    createShape: throwUndefined,
-    update: noop
-  };
+    BaseShape.prototype = {
+        createShape: throwUndefined,
+        update: noop
+    };
 
-  return BaseShape;
+    return BaseShape;
 });

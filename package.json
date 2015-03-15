@@ -8,11 +8,6 @@
     "Thomas Parisot <thomas.parisot@bbc.co.uk> (https://github.com/oncletom)",
     "Chris Needham (https://github.com/chrisn)"
   ],
-  "browserify": {
-    "transform": [
-      "deamdify"
-    ]
-  },
   "browser": {
     "EventEmitter": "eventemitter2",
     "Kinetic": "kinetic",
@@ -36,7 +31,7 @@
   },
   "license": "LGPL 3",
   "scripts": {
-    "build": "browserify -d ./src/main.js -p [minifyify --map peaks.min.map --output peaks.min.map] -s peaks -o peaks.min.js",
+    "build": "webpack ./src/main.js build/peaks.js",
     "test": "npm run test-pre && ./node_modules/karma/bin/karma start --single-run",
     "test-pre": "jshint ./src",
     "test-watch": "./node_modules/karma/bin/karma start --auto-watch --no-single-run",
@@ -57,18 +52,12 @@
     "karma-requirejs": "^0.2.2",
     "karma-safari-launcher": "^0.1.1",
     "karma-sinon-chai": "^0.2.0",
-    "minifyify": "^4.2.0",
     "mocha": "^1.17.1",
-    "requirejs": "^2.1.15",
     "serve": "^1.4.0"
   },
   "dependencies": {
     "eventemitter2": "^0.4.14",
     "kinetic": "^5.0.6",
-    "waveform-data": "^1.4.3"
-  },
-  "optionalDependencies": {
-    "browserify": "^5.12.0",
-    "deamdify": "^0.1.1"
+    "waveform-data": "git://github.com/sbmaxx/waveform-data.js.git#master"
   }
 }

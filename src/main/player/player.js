@@ -24,95 +24,95 @@
  * player.setVolume
  */
 
-define(["peaks/waveform/waveform.mixins"], function (mixins) {
-  'use strict';
+define(["peaks/waveform/waveform.mixins"], function(mixins) {
+    'use strict';
 
-  var radio = function (peaks) {
+    var radio = function(peaks) {
 
-    function timeFromPercentage(time, percentage) {
-      return time * (percentage / 100);
-    }
-
-    return {
-      init: function (mediaElement) {
-        var that = this;
-
-        this.mediaElement = mediaElement;
-        this.duration = this.mediaElement.duration;
-
-        if (this.mediaElement.readyState === 4) {
-          peaks.emit("player_load", that);
+        function timeFromPercentage(time, percentage) {
+            return time * (percentage / 100);
         }
 
-        this.mediaElement.addEventListener("timeupdate", function () {
-          peaks.emit("player_time_update", that.getTime());
-        });
+        return {
+            init: function(mediaElement) {
+                var that = this;
 
-        this.mediaElement.addEventListener("play", function () {
-          peaks.emit("player_play", that.getTime());
-        });
+                this.mediaElement = mediaElement;
+                this.duration = this.mediaElement.duration;
 
-        this.mediaElement.addEventListener("pause", function () {
-          peaks.emit("player_pause", that.getTime());
-        });
+                if (this.mediaElement.readyState === 4) {
+                    peaks.emit("player_load", that);
+                }
 
-        this.mediaElement.addEventListener("seeked", function () {
-          peaks.emit("player_seek", that.getTime());
-        });
-      },
+                this.mediaElement.addEventListener("timeupdate", function() {
+                    peaks.emit("player_time_update", that.getTime());
+                });
 
-      setSource: function(source) {
-        this.mediaElement.setAttribute('src', source);
-      },
+                this.mediaElement.addEventListener("play", function() {
+                    peaks.emit("player_play", that.getTime());
+                });
 
-      getSource: function() {
-        return this.mediaElement.src;
-      },
+                this.mediaElement.addEventListener("pause", function() {
+                    peaks.emit("player_pause", that.getTime());
+                });
 
-      play: function () {
-        this.mediaElement.play();
-        peaks.emit("radio_play", this.getTime());
-      },
+                this.mediaElement.addEventListener("seeked", function() {
+                    peaks.emit("player_seek", that.getTime());
+                });
+            },
 
-      pause: function () {
-        this.mediaElement.pause();
-        peaks.emit("radio_pause", this.getTime());
-      },
+            setSource: function(source) {
+                this.mediaElement.setAttribute('src', source);
+            },
 
-      getTime: function () {
-        return this.mediaElement.currentTime;
-      },
+            getSource: function() {
+                return this.mediaElement.src;
+            },
 
-      getTimeFromPercentage: function (p) {
-        return mixins.niceTime(this.duration * p / 100, false);
-      },
+            play: function() {
+                this.mediaElement.play();
+                peaks.emit("radio_play", this.getTime());
+            },
 
-      getSecsFromPercentage: function (p) {
-        return Math.floor(this.duration * p / 100);
-      },
+            pause: function() {
+                this.mediaElement.pause();
+                peaks.emit("radio_pause", this.getTime());
+            },
 
-      getDuration: function () {
-        return this.mediaElement.duration;
-      },
+            getTime: function() {
+                return this.mediaElement.currentTime;
+            },
 
-      getPercentage: function () {
-        return this.getPercentageFromSeconds(this.mediaElement.currentTime);
-      },
+            getTimeFromPercentage: function(p) {
+                return mixins.niceTime(this.duration * p / 100, false);
+            },
 
-      getPercentageFromSeconds: function (s) {
-        var percentage = (s / this.duration) * 100;
-        return Math.round(percentage * 100) / 100; // 2DP
-      },
+            getSecsFromPercentage: function(p) {
+                return Math.floor(this.duration * p / 100);
+            },
 
-      seek: function (percentage) {
-        this.mediaElement.currentTime = timeFromPercentage(this.duration, percentage);
-      },
+            getDuration: function() {
+                return this.mediaElement.duration;
+            },
 
-      seekBySeconds: function (seconds) {
-        this.mediaElement.currentTime = seconds;
-      }
+            getPercentage: function() {
+                return this.getPercentageFromSeconds(this.mediaElement.currentTime);
+            },
+
+            getPercentageFromSeconds: function(s) {
+                var percentage = (s / this.duration) * 100;
+                return Math.round(percentage * 100) / 100; // 2DP
+            },
+
+            seek: function(percentage) {
+                this.mediaElement.currentTime = timeFromPercentage(this.duration, percentage);
+            },
+
+            seekBySeconds: function(seconds) {
+                this.mediaElement.currentTime = seconds;
+            }
+        };
     };
-  };
 
-  return radio;
+    return radio;
 });
