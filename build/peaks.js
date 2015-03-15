@@ -45,551 +45,546 @@
 /***/ function(module, exports, __webpack_require__) {
 
 	var __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_DEFINE_RESULT__;!(__WEBPACK_AMD_DEFINE_ARRAY__ = [
-	  __webpack_require__(5),
-	  __webpack_require__(1),
-	  __webpack_require__(3),
-	  __webpack_require__(4),
-	  __webpack_require__(2)
-	], __WEBPACK_AMD_DEFINE_RESULT__ = function (EventEmitter, AudioPlayer, Waveform, mixins, keyboard) {
-	  'use strict';
+	    __webpack_require__(5),
+	    __webpack_require__(1),
+	    __webpack_require__(3),
+	    __webpack_require__(4),
+	    __webpack_require__(2)
+	], __WEBPACK_AMD_DEFINE_RESULT__ = function(EventEmitter, AudioPlayer, Waveform, mixins, keyboard) {
+	    'use strict';
 
-	  var buildUi = function (container) {
-	    return {
-	      'player':   container.querySelector(".waveform"),
-	      'zoom':     container.querySelector(".zoom-container"),
-	      'overview': container.querySelector(".overview-container")
-	    };
-	  };
-
-	  var extend = function (to, from) {
-	    for (var key in from) {
-	      to[key] = from[key];
-	    }
-
-	    return to;
-	  };
-
-	  var ee = (EventEmitter.EventEmitter2 || EventEmitter);
-
-	  function Peaks (container) {
-	    ee.call(this, { wildcard: true });
-
-	    this.options = {
-	      /**
-	       * Array of scale factors (samples per pixel) for the zoom levels (big >> small)
-	       */
-	      zoomLevels:            [512, 1024, 2048, 4096],
-	      /**
-	       * Data URI where to get the waveform data.
-	       *
-	       * If a string, we assume that `this.dataUriDefaultFormat` is the default `xhr.responseType` value.
-	       *
-	       * @since 0.0.1
-	       *
-	       * ```js
-	       * dataUri: 'url/to/data.json?waveformId=1337'
-	       * ```
-	       *
-	       * If an object, each key is an `xhr.responseType` which will contain its associated source URI.
-	       *
-	       * @since 0.3.0
-	       *
-	       * ```js
-	       * dataUri: {
-	       *   arraybuffer: 'url/to/data.dat',
-	       *   json: 'url/to/data.json'
-	       * }
-	       * ```
-	       */
-	      dataUri:               null,
-	      /**
-	       * Will be used as a `xhr.responseType` if `dataUri` is a string, and not an object.
-	       * Here for backward compatibility purpose only.
-	       *
-	       * @since 0.3.0
-	       */
-	      dataUriDefaultFormat:  'json',
-	      /**
-	       * Will report errors to that function
-	       *
-	       * @type {Function=}
-	       * @since 0.5.0
-	       */
-	      logger:                null,
-	      /**
-	       * Bind keyboard controls
-	       */
-	      keyboard:              false,
-	      /**
-	       * Keyboard nudge increment in seconds (left arrow/right arrow)
-	       */
-	      nudgeIncrement:        0.01,
-	      /**
-	       * Colour for the in marker of segments
-	       */
-	      inMarkerColor:         '#a0a0a0',
-	      /**
-	       * Colour for the out marker of segments
-	       */
-	      outMarkerColor:        '#a0a0a0',
-	      /**
-	       * Colour for the zoomed in waveform
-	       */
-	      zoomWaveformColor:     'rgba(0, 225, 128, 1)',
-	      /**
-	       * Colour for the overview waveform
-	       */
-	      overviewWaveformColor: 'rgba(0,0,0,0.2)',
-	      /**
-	       * Random colour per segment (overrides segmentColor)
-	       */
-	      randomizeSegmentColor: true,
-	      /**
-	       * Height of the waveform canvases in pixels
-	       */
-	      height:                200,
-	      /**
-	       * Colour for segments on the waveform
-	       */
-	      segmentColor:          'rgba(255, 161, 39, 1)',
-	      /**
-	       * Colour of the play head
-	       */
-	      playheadColor:         'rgba(0, 0, 0, 1)',
-	      /**
-	       *
-	       */
-	      template:              [
-	                               '<div class="waveform">',
-	                               '<div class="zoom-container"></div>',
-	                               '<div class="overview-container"></div>',
-	                               '</div>'
-	                             ].join(''),
-
-	      /**
-	       * Related to points
-	       */
-	      pointMarkerColor:     '#FF0000', //Color for the point marker
-	      pointDblClickHandler: null, //Handler called when point handle double clicked.
-	      pointDragEndHandler:  null, // Called when the point handle has finished dragging
-
-	      /**
-	       * WaveformData WebAudio Decoder Options
-	       *
-	       * You mostly want to play with the 'scale' option.
-	       *
-	       * @see https://github.com/bbcrd/waveform-data.js/blob/master/lib/builders/webaudio.js
-	       */
-	       waveformBuilderOptions: {
-	        scale: 512,
-	        scale_adjuster: 127
-	       }
+	    var buildUi = function(container) {
+	        return {
+	            'player': container.querySelector(".waveform"),
+	            'zoom': container.querySelector(".zoom-container"),
+	            'overview': container.querySelector(".overview-container")
+	        };
 	    };
 
-	    /**
-	     *
-	     * @type {HTMLElement}
-	     */
-	    this.container = container;
-
-	    /**
-	     *
-	     * @type {number}
-	     */
-	    this.currentZoomLevel = 0;
-
-	    /**
-	     * Asynchronous errors logger.
-	     *
-	     * @type {Function}
-	     */
-	    this.logger = console.error.bind(console);
-	  }
-
-	  Peaks.init = function init (opts) {
-	    opts = opts || {};
-
-	    if (opts.audioElement) {
-	      opts.mediaElement = opts.audioElement;
-
-	      if (console && typeof console.log === 'function') {
-	        console.log('[Peaks.init] `audioElement` option is deprecated. Please use `mediaElement` instead.');
-	      }
-	    }
-
-	    if (!opts.mediaElement) {
-	      throw new Error("[Peaks.init] Please provide an audio element.");
-	    }
-
-	    if (!(opts.mediaElement instanceof HTMLMediaElement)) {
-	      throw new TypeError("[Peaks.init] The mediaElement option should be an HTMLMediaElement.");
-	    }
-
-	    if (!opts.container) {
-	      throw new Error("[Peaks.init] Please provide a container object.");
-	    }
-
-	    if ((opts.container.clientWidth > 0) === false) {
-	      throw new TypeError("[Peaks.init] Please ensure that the container has a width.");
-	    }
-
-	    if (opts.logger && typeof opts.logger !== 'function') {
-	      throw new TypeError("[Peaks.init] The `logger` option should be a function.");
-	    }
-
-	    var instance = new Peaks(opts.container);
-
-	    extend(instance.options, opts);
-	    extend(instance.options, {
-	      segmentInMarker:  mixins.defaultInMarker(instance.options),
-	      segmentOutMarker: mixins.defaultOutMarker(instance.options),
-	      segmentLabelDraw: mixins.defaultSegmentLabelDraw(instance.options),
-	      pointMarker:      mixins.defaultPointMarker(instance.options)
-	    });
-
-	    /*
-	     Setup the logger
-	     */
-	    if (opts.logger) {
-	      instance.logger = opts.logger;
-	    }
-
-	    instance.on('error', instance.logger.bind(null));
-
-	    /*
-	     Setup the layout
-	     */
-	    if (typeof instance.options.template === 'string') {
-	      instance.container.innerHTML = instance.options.template;
-	    }
-	    else if (instance.options.template instanceof HTMLElement) {
-	      instance.container.appendChild(instance.options.template);
-	    }
-	    else {
-	      throw new TypeError("Please ensure you provide an HTML string or a DOM template as `template` instance option. Provided: " + instance.options.template);
-	    }
-
-	    if (instance.options.keyboard) keyboard.init(instance);
-
-	    instance.player = new AudioPlayer(instance);
-	    instance.player.init(instance.options.mediaElement);
-
-	    /*
-	     Setup the UI components
-	     */
-	    instance.waveform = new Waveform(instance);
-	    instance.waveform.init(buildUi(instance.container));
-
-	    // TODO maybe to move in the player object
-	    instance.seeking = false;
-
-	    instance.on("waveformOverviewReady", function () {
-	      instance.waveform.openZoomView();
-
-	      if (instance.options.segments) { // Any initial segments to be displayed?
-	        instance.segments.addSegment(instance.options.segments);
-	      }
-
-	      if (instance.options.points) { //Any initial points to be displayed?
-	        instance.points.addPoint(instance.options.points);
-	      }
-
-	    });
-
-	    return instance;
-	  };
-
-	  // Temporary workaround while https://github.com/asyncly/EventEmitter2/pull/122
-	  Peaks.prototype = Object.create(ee.prototype, {
-	    segments: {
-	      get: function () {
-	        var self = this;
-
-	        function addSegment (startTime, endTime, editable, color, labelText) {
-	          var segments = arguments[0];
-
-	          if (typeof segments === "number") {
-	            segments = [
-	              {
-	                startTime: startTime,
-	                endTime:   endTime,
-	                editable:  editable,
-	                color:     color,
-	                labelText: labelText
-	              }
-	            ];
-	          }
-
-	          if (Array.isArray(segments)) {
-	            segments.forEach(function (segment) {
-	              self.waveform.segments.createSegment(segment.startTime, segment.endTime, segment.editable, segment.color, segment.labelText);
-	            });
-
-	            self.waveform.segments.render();
-	          }
-	          else {
-	            throw new TypeError("[Peaks.segments.addSegment] Unrecognized segment parameters.");
-	          }
+	    var extend = function(to, from) {
+	        for (var key in from) {
+	            to[key] = from[key];
 	        }
 
-	        return {
-	          addSegment: addSegment,
-	          add:        addSegment,
+	        return to;
+	    };
 
-	          remove: function (segment) {
-	            var index = self.waveform.segments.remove(segment);
+	    var ee = (EventEmitter.EventEmitter2 || EventEmitter);
 
-	            if (index === null) {
-	              throw new RangeError('Unable to find the requested segment' + String(segment));
+	    function Peaks(container) {
+	        ee.call(this, {
+	            wildcard: true
+	        });
+
+	        this.options = {
+	            /**
+	             * Array of scale factors (samples per pixel) for the zoom levels (big >> small)
+	             */
+	            zoomLevels: [512, 1024, 2048, 4096],
+	            /**
+	             * Data URI where to get the waveform data.
+	             *
+	             * If a string, we assume that `this.dataUriDefaultFormat` is the default `xhr.responseType` value.
+	             *
+	             * @since 0.0.1
+	             *
+	             * ```js
+	             * dataUri: 'url/to/data.json?waveformId=1337'
+	             * ```
+	             *
+	             * If an object, each key is an `xhr.responseType` which will contain its associated source URI.
+	             *
+	             * @since 0.3.0
+	             *
+	             * ```js
+	             * dataUri: {
+	             *   arraybuffer: 'url/to/data.dat',
+	             *   json: 'url/to/data.json'
+	             * }
+	             * ```
+	             */
+	            dataUri: null,
+	            /**
+	             * Will be used as a `xhr.responseType` if `dataUri` is a string, and not an object.
+	             * Here for backward compatibility purpose only.
+	             *
+	             * @since 0.3.0
+	             */
+	            dataUriDefaultFormat: 'json',
+	            /**
+	             * Will report errors to that function
+	             *
+	             * @type {Function=}
+	             * @since 0.5.0
+	             */
+	            logger: null,
+	            /**
+	             * Bind keyboard controls
+	             */
+	            keyboard: false,
+	            /**
+	             * Keyboard nudge increment in seconds (left arrow/right arrow)
+	             */
+	            nudgeIncrement: 0.01,
+	            /**
+	             * Colour for the in marker of segments
+	             */
+	            inMarkerColor: '#a0a0a0',
+	            /**
+	             * Colour for the out marker of segments
+	             */
+	            outMarkerColor: '#a0a0a0',
+	            /**
+	             * Colour for the zoomed in waveform
+	             */
+	            zoomWaveformColor: 'rgba(0, 225, 128, 1)',
+	            /**
+	             * Colour for the overview waveform
+	             */
+	            overviewWaveformColor: 'rgba(0,0,0,0.2)',
+	            /**
+	             * Random colour per segment (overrides segmentColor)
+	             */
+	            randomizeSegmentColor: true,
+	            /**
+	             * Height of the waveform canvases in pixels
+	             */
+	            height: 200,
+	            /**
+	             * Colour for segments on the waveform
+	             */
+	            segmentColor: 'rgba(255, 161, 39, 1)',
+	            /**
+	             * Colour of the play head
+	             */
+	            playheadColor: 'rgba(0, 0, 0, 1)',
+	            /**
+	             *
+	             */
+	            template: [
+	                '<div class="waveform">',
+	                '<div class="zoom-container"></div>',
+	                '<div class="overview-container"></div>',
+	                '</div>'
+	            ].join(''),
+
+	            /**
+	             * Related to points
+	             */
+	            pointMarkerColor: '#FF0000', //Color for the point marker
+	            pointDblClickHandler: null, //Handler called when point handle double clicked.
+	            pointDragEndHandler: null, // Called when the point handle has finished dragging
+
+	            /**
+	             * WaveformData WebAudio Decoder Options
+	             *
+	             * You mostly want to play with the 'scale' option.
+	             *
+	             * @see https://github.com/bbcrd/waveform-data.js/blob/master/lib/builders/webaudio.js
+	             */
+	            waveformBuilderOptions: {
+	                scale: 512,
+	                scale_adjuster: 127
 	            }
-
-	            self.waveform.segments.updateSegments();
-
-	            return self.waveform.segments.segments.splice(index, 1).pop();
-	          },
-
-	          removeByTime: function (startTime, endTime) {
-	            endTime = (typeof endTime === 'number') ? endTime : 0;
-	            var fnFilter;
-
-	            if (endTime > 0) {
-	              fnFilter = function (segment) {
-	                return segment.startTime === startTime && segment.endTime === endTime;
-	              };
-	            }
-	            else {
-	              fnFilter = function (segment) {
-	                return segment.startTime === startTime;
-	              };
-	            }
-
-	            var indexes = self.waveform.segments.segments
-	              .filter(fnFilter)
-	              .map(function (segment, i) {
-	                self.waveform.segments.remove(segment);
-
-	                return i;
-	              })
-	              .sort(function (a, b) {
-	                return b - a;
-	              })
-	              .map(function (index) {
-	                self.waveform.segments.segments.splice(index, 1);
-
-	                return index;
-	              });
-
-	            self.waveform.segments.updateSegments();
-
-	            return indexes.length;
-	          },
-
-	          removeAll: function () {
-	            self.waveform.segments.removeAll();
-	          },
-
-	          getSegments: function () {
-	            return self.waveform.segments.segments;
-	          }
 	        };
-	      }
-	    },
-	    /**
-	     * Points API
-	     */
-	    points:   {
-	      get: function () {
-	        var self = this;
-	        return {
-	          /**
-	           *
-	           * @param timeStamp
-	           * @param editable
-	           * @param color
-	           * @param labelText
-	           */
-	          add: function (timestamp, editable, color, labelText) {
-	            var points = arguments[0];
 
-	            if (typeof points === "number") {
-	              points = [{
-	                timestamp: timestamp,
-	                editable:  editable,
-	                color:     color,
-	                labelText: labelText
-	              }];
-	            }
+	        /**
+	         *
+	         * @type {HTMLElement}
+	         */
+	        this.container = container;
 
-	            if (Array.isArray(points)) {
-	              points.forEach(self.waveform.points.createPoint.bind(self.waveform.points));
-	              self.waveform.points.render();
-	            }
-	            else {
-	              throw new TypeError("[Peaks.points.addPoint] Unrecognized point parameters.");
-	            }
-	          },
-	          /**
-	           *
-	           * @returns {*|WaveformOverview.playheadLine.points|WaveformZoomView.zoomPlayheadLine.points|points|o.points|n.createUi.points}
-	           */
-	          getPoints: function () {
-	            return self.waveform.points.points;
-	          },
-	          /**
-	           *
-	           * @param id
-	           */
-	          removeByTime: function (timestamp) {
-	            var indexes = self.waveform.points.points
-	              .filter(function(point){
-	                return point.timestamp === timestamp;
-	              })
-	              .map(function (point, i) {
-	                self.waveform.points.remove(point);
+	        /**
+	         *
+	         * @type {number}
+	         */
+	        this.currentZoomLevel = 0;
 
-	                return i;
-	              })
-	              .sort(function (a, b) {
-	                return b - a;
-	              })
-	              .map(function (index) {
-	                self.waveform.points.points.splice(index, 1);
-
-	                return index;
-	              });
-
-	            self.waveform.points.render();
-
-	            return indexes.length;
-	          },
-
-	          /**
-	           * Remove all points
-	           *
-	           * @api
-	           * @since 0.3.2
-	           */
-	          removeAll: function removeAll(){
-	            self.waveform.points.removeAll();
-	          }
-	        };
-	      }
-	    },
-	    /**
-	     * Time API
-	     */
-	    time:     {
-	      get: function () {
-	        var self = this;
-
-	        return {
-	          /**
-	           * Seeks the media player to that exat time.
-	           * Infers the playhead position to that same time.
-	           *
-	           * ```js
-	           * var p = Peaks.init(…);
-	           * p.time.setCurrentTime(20.5);
-	           * ```
-	           *
-	           * @param {Number} time
-	           */
-	          setCurrentTime: function setCurrentTime (time) {
-	            return self.player.seekBySeconds(time);
-	          },
-	          /**
-	           * Returns the actual time of the media element, in seconds.
-	           *
-	           * ```js
-	           * var p = Peaks.init(…);
-	           * p.time.getCurrentTime();     // -> 0
-	           * ```
-	           *
-	           * @returns {Number}
-	           */
-
-	          getCurrentTime: function () {
-	            return self.player.getTime();
-	          }
-	        };
-	      }
-	    },
-	    /**
-	     * Zoom API
-	     */
-	    zoom:     {
-	      get: function () {
-	        var self = this;
-	        return {
-
-	          /**
-	           * Zoom in one level
-	           */
-	          zoomIn: function () {
-	            self.zoom.setZoom(self.currentZoomLevel - 1);
-	          },
-
-	          /**
-	           * Zoom out one level
-	           */
-	          zoomOut: function () {
-	            self.zoom.setZoom(self.currentZoomLevel + 1);
-	          },
-
-	          /**
-	           * Given a particular zoom level, triggers a resampling of the data in the zoomed view
-	           *
-	           * @param {number} zoomLevelIndex
-	           */
-	          setZoom: function (zoomLevelIndex) { // Set zoom level to index of current zoom levels
-	            if (zoomLevelIndex >= self.options.zoomLevels.length) {
-	              zoomLevelIndex = self.options.zoomLevels.length - 1;
-	            }
-
-	            if (zoomLevelIndex < 0) {
-	              zoomLevelIndex = 0;
-	            }
-
-	            var previousZoomLevel = self.currentZoomLevel;
-
-	            self.currentZoomLevel = zoomLevelIndex;
-	            self.emit("zoom.update", self.options.zoomLevels[zoomLevelIndex], self.options.zoomLevels[previousZoomLevel]);
-	          },
-
-	          /**
-	           * Returns the current zoom level
-	           *
-	           * @returns {number}
-	           */
-	          getZoom: function () {
-	            return self.currentZoomLevel;
-	          },
-
-	          /**
-	           * Sets the zoom level to an overview level
-	           *
-	           * @since 0.3
-	           */
-	          overview: function zoomToOverview() {
-	            self.emit("zoom.update", self.waveform.waveformOverview.data.adapter.scale, self.options.zoomLevels[ self.currentZoomLevel ]);
-	          },
-
-	          /**
-	           * Sets the zoom level to an overview level
-	           *
-	           * @since 0.3
-	           */
-	          reset: function resetOverview() {
-	            self.emit("zoom.update", self.options.zoomLevels[ self.currentZoomLevel ], self.waveform.waveformOverview.data.adapter.scale);
-	          }
-	        };
-	      }
+	        /**
+	         * Asynchronous errors logger.
+	         *
+	         * @type {Function}
+	         */
+	        this.logger = console.error.bind(console);
 	    }
-	  });
 
-	  window.Peaks = Peaks;
+	    Peaks.init = function init(opts) {
+	        opts = opts || {};
 
-	  return Peaks;
+	        if (opts.audioElement) {
+	            opts.mediaElement = opts.audioElement;
+
+	            if (console && typeof console.log === 'function') {
+	                console.log('[Peaks.init] `audioElement` option is deprecated. Please use `mediaElement` instead.');
+	            }
+	        }
+
+	        if (!opts.mediaElement) {
+	            throw new Error("[Peaks.init] Please provide an audio element.");
+	        }
+
+	        if (!(opts.mediaElement instanceof HTMLMediaElement)) {
+	            throw new TypeError("[Peaks.init] The mediaElement option should be an HTMLMediaElement.");
+	        }
+
+	        if (!opts.container) {
+	            throw new Error("[Peaks.init] Please provide a container object.");
+	        }
+
+	        if ((opts.container.clientWidth > 0) === false) {
+	            throw new TypeError("[Peaks.init] Please ensure that the container has a width.");
+	        }
+
+	        if (opts.logger && typeof opts.logger !== 'function') {
+	            throw new TypeError("[Peaks.init] The `logger` option should be a function.");
+	        }
+
+	        var instance = new Peaks(opts.container);
+
+	        extend(instance.options, opts);
+	        extend(instance.options, {
+	            segmentInMarker: mixins.defaultInMarker(instance.options),
+	            segmentOutMarker: mixins.defaultOutMarker(instance.options),
+	            segmentLabelDraw: mixins.defaultSegmentLabelDraw(instance.options),
+	            pointMarker: mixins.defaultPointMarker(instance.options)
+	        });
+
+	        /*
+	         Setup the logger
+	         */
+	        if (opts.logger) {
+	            instance.logger = opts.logger;
+	        }
+
+	        instance.on('error', instance.logger.bind(null));
+
+	        /*
+	         Setup the layout
+	         */
+	        if (typeof instance.options.template === 'string') {
+	            instance.container.innerHTML = instance.options.template;
+	        } else if (instance.options.template instanceof HTMLElement) {
+	            instance.container.appendChild(instance.options.template);
+	        } else {
+	            throw new TypeError("Please ensure you provide an HTML string or a DOM template as `template` instance option. Provided: " + instance.options.template);
+	        }
+
+	        if (instance.options.keyboard) keyboard.init(instance);
+
+	        instance.player = new AudioPlayer(instance);
+	        instance.player.init(instance.options.mediaElement);
+
+	        /*
+	         Setup the UI components
+	         */
+	        instance.waveform = new Waveform(instance);
+	        instance.waveform.init(buildUi(instance.container));
+
+	        // TODO maybe to move in the player object
+	        instance.seeking = false;
+
+	        instance.on("waveformOverviewReady", function() {
+	            instance.waveform.openZoomView();
+
+	            if (instance.options.segments) { // Any initial segments to be displayed?
+	                instance.segments.addSegment(instance.options.segments);
+	            }
+
+	            if (instance.options.points) { //Any initial points to be displayed?
+	                instance.points.addPoint(instance.options.points);
+	            }
+
+	        });
+
+	        return instance;
+	    };
+
+	    // Temporary workaround while https://github.com/asyncly/EventEmitter2/pull/122
+	    Peaks.prototype = Object.create(ee.prototype, {
+	        segments: {
+	            get: function() {
+	                var self = this;
+
+	                function addSegment(startTime, endTime, editable, color, labelText) {
+	                    var segments = arguments[0];
+
+	                    if (typeof segments === "number") {
+	                        segments = [{
+	                            startTime: startTime,
+	                            endTime: endTime,
+	                            editable: editable,
+	                            color: color,
+	                            labelText: labelText
+	                        }];
+	                    }
+
+	                    if (Array.isArray(segments)) {
+	                        segments.forEach(function(segment) {
+	                            self.waveform.segments.createSegment(segment.startTime, segment.endTime, segment.editable, segment.color, segment.labelText);
+	                        });
+
+	                        self.waveform.segments.render();
+	                    } else {
+	                        throw new TypeError("[Peaks.segments.addSegment] Unrecognized segment parameters.");
+	                    }
+	                }
+
+	                return {
+	                    addSegment: addSegment,
+	                    add: addSegment,
+
+	                    remove: function(segment) {
+	                        var index = self.waveform.segments.remove(segment);
+
+	                        if (index === null) {
+	                            throw new RangeError('Unable to find the requested segment' + String(segment));
+	                        }
+
+	                        self.waveform.segments.updateSegments();
+
+	                        return self.waveform.segments.segments.splice(index, 1).pop();
+	                    },
+
+	                    removeByTime: function(startTime, endTime) {
+	                        endTime = (typeof endTime === 'number') ? endTime : 0;
+	                        var fnFilter;
+
+	                        if (endTime > 0) {
+	                            fnFilter = function(segment) {
+	                                return segment.startTime === startTime && segment.endTime === endTime;
+	                            };
+	                        } else {
+	                            fnFilter = function(segment) {
+	                                return segment.startTime === startTime;
+	                            };
+	                        }
+
+	                        var indexes = self.waveform.segments.segments
+	                            .filter(fnFilter)
+	                            .map(function(segment, i) {
+	                                self.waveform.segments.remove(segment);
+
+	                                return i;
+	                            })
+	                            .sort(function(a, b) {
+	                                return b - a;
+	                            })
+	                            .map(function(index) {
+	                                self.waveform.segments.segments.splice(index, 1);
+
+	                                return index;
+	                            });
+
+	                        self.waveform.segments.updateSegments();
+
+	                        return indexes.length;
+	                    },
+
+	                    removeAll: function() {
+	                        self.waveform.segments.removeAll();
+	                    },
+
+	                    getSegments: function() {
+	                        return self.waveform.segments.segments;
+	                    }
+	                };
+	            }
+	        },
+	        /**
+	         * Points API
+	         */
+	        points: {
+	            get: function() {
+	                var self = this;
+	                return {
+	                    /**
+	                     *
+	                     * @param timeStamp
+	                     * @param editable
+	                     * @param color
+	                     * @param labelText
+	                     */
+	                    add: function(timestamp, editable, color, labelText) {
+	                        var points = arguments[0];
+
+	                        if (typeof points === "number") {
+	                            points = [{
+	                                timestamp: timestamp,
+	                                editable: editable,
+	                                color: color,
+	                                labelText: labelText
+	                            }];
+	                        }
+
+	                        if (Array.isArray(points)) {
+	                            points.forEach(self.waveform.points.createPoint.bind(self.waveform.points));
+	                            self.waveform.points.render();
+	                        } else {
+	                            throw new TypeError("[Peaks.points.addPoint] Unrecognized point parameters.");
+	                        }
+	                    },
+	                    /**
+	                     *
+	                     * @returns {*|WaveformOverview.playheadLine.points|WaveformZoomView.zoomPlayheadLine.points|points|o.points|n.createUi.points}
+	                     */
+	                    getPoints: function() {
+	                        return self.waveform.points.points;
+	                    },
+	                    /**
+	                     *
+	                     * @param id
+	                     */
+	                    removeByTime: function(timestamp) {
+	                        var indexes = self.waveform.points.points
+	                            .filter(function(point) {
+	                                return point.timestamp === timestamp;
+	                            })
+	                            .map(function(point, i) {
+	                                self.waveform.points.remove(point);
+
+	                                return i;
+	                            })
+	                            .sort(function(a, b) {
+	                                return b - a;
+	                            })
+	                            .map(function(index) {
+	                                self.waveform.points.points.splice(index, 1);
+
+	                                return index;
+	                            });
+
+	                        self.waveform.points.render();
+
+	                        return indexes.length;
+	                    },
+
+	                    /**
+	                     * Remove all points
+	                     *
+	                     * @api
+	                     * @since 0.3.2
+	                     */
+	                    removeAll: function removeAll() {
+	                        self.waveform.points.removeAll();
+	                    }
+	                };
+	            }
+	        },
+	        /**
+	         * Time API
+	         */
+	        time: {
+	            get: function() {
+	                var self = this;
+
+	                return {
+	                    /**
+	                     * Seeks the media player to that exat time.
+	                     * Infers the playhead position to that same time.
+	                     *
+	                     * ```js
+	                     * var p = Peaks.init(…);
+	                     * p.time.setCurrentTime(20.5);
+	                     * ```
+	                     *
+	                     * @param {Number} time
+	                     */
+	                    setCurrentTime: function setCurrentTime(time) {
+	                        return self.player.seekBySeconds(time);
+	                    },
+	                    /**
+	                     * Returns the actual time of the media element, in seconds.
+	                     *
+	                     * ```js
+	                     * var p = Peaks.init(…);
+	                     * p.time.getCurrentTime();     // -> 0
+	                     * ```
+	                     *
+	                     * @returns {Number}
+	                     */
+
+	                    getCurrentTime: function() {
+	                        return self.player.getTime();
+	                    }
+	                };
+	            }
+	        },
+	        /**
+	         * Zoom API
+	         */
+	        zoom: {
+	            get: function() {
+	                var self = this;
+	                return {
+
+	                    /**
+	                     * Zoom in one level
+	                     */
+	                    zoomIn: function() {
+	                        self.zoom.setZoom(self.currentZoomLevel - 1);
+	                    },
+
+	                    /**
+	                     * Zoom out one level
+	                     */
+	                    zoomOut: function() {
+	                        self.zoom.setZoom(self.currentZoomLevel + 1);
+	                    },
+
+	                    /**
+	                     * Given a particular zoom level, triggers a resampling of the data in the zoomed view
+	                     *
+	                     * @param {number} zoomLevelIndex
+	                     */
+	                    setZoom: function(zoomLevelIndex) { // Set zoom level to index of current zoom levels
+	                        if (zoomLevelIndex >= self.options.zoomLevels.length) {
+	                            zoomLevelIndex = self.options.zoomLevels.length - 1;
+	                        }
+
+	                        if (zoomLevelIndex < 0) {
+	                            zoomLevelIndex = 0;
+	                        }
+
+	                        var previousZoomLevel = self.currentZoomLevel;
+
+	                        self.currentZoomLevel = zoomLevelIndex;
+	                        self.emit("zoom.update", self.options.zoomLevels[zoomLevelIndex], self.options.zoomLevels[previousZoomLevel]);
+	                    },
+
+	                    /**
+	                     * Returns the current zoom level
+	                     *
+	                     * @returns {number}
+	                     */
+	                    getZoom: function() {
+	                        return self.currentZoomLevel;
+	                    },
+
+	                    /**
+	                     * Sets the zoom level to an overview level
+	                     *
+	                     * @since 0.3
+	                     */
+	                    overview: function zoomToOverview() {
+	                        self.emit("zoom.update", self.waveform.waveformOverview.data.adapter.scale, self.options.zoomLevels[self.currentZoomLevel]);
+	                    },
+
+	                    /**
+	                     * Sets the zoom level to an overview level
+	                     *
+	                     * @since 0.3
+	                     */
+	                    reset: function resetOverview() {
+	                        self.emit("zoom.update", self.options.zoomLevels[self.currentZoomLevel], self.waveform.waveformOverview.data.adapter.scale);
+	                    }
+	                };
+	            }
+	        }
+	    });
+
+	    window.Peaks = Peaks;
+
+	    return Peaks;
 	}.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__), __WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
 
 
@@ -623,97 +618,97 @@
 	 * player.setVolume
 	 */
 
-	!(__WEBPACK_AMD_DEFINE_ARRAY__ = [__webpack_require__(4)], __WEBPACK_AMD_DEFINE_RESULT__ = function (mixins) {
-	  'use strict';
+	!(__WEBPACK_AMD_DEFINE_ARRAY__ = [__webpack_require__(4)], __WEBPACK_AMD_DEFINE_RESULT__ = function(mixins) {
+	    'use strict';
 
-	  var radio = function (peaks) {
+	    var radio = function(peaks) {
 
-	    function timeFromPercentage(time, percentage) {
-	      return time * (percentage / 100);
-	    }
-
-	    return {
-	      init: function (mediaElement) {
-	        var that = this;
-
-	        this.mediaElement = mediaElement;
-	        this.duration = this.mediaElement.duration;
-
-	        if (this.mediaElement.readyState === 4) {
-	          peaks.emit("player_load", that);
+	        function timeFromPercentage(time, percentage) {
+	            return time * (percentage / 100);
 	        }
 
-	        this.mediaElement.addEventListener("timeupdate", function () {
-	          peaks.emit("player_time_update", that.getTime());
-	        });
+	        return {
+	            init: function(mediaElement) {
+	                var that = this;
 
-	        this.mediaElement.addEventListener("play", function () {
-	          peaks.emit("player_play", that.getTime());
-	        });
+	                this.mediaElement = mediaElement;
+	                this.duration = this.mediaElement.duration;
 
-	        this.mediaElement.addEventListener("pause", function () {
-	          peaks.emit("player_pause", that.getTime());
-	        });
+	                if (this.mediaElement.readyState === 4) {
+	                    peaks.emit("player_load", that);
+	                }
 
-	        this.mediaElement.addEventListener("seeked", function () {
-	          peaks.emit("player_seek", that.getTime());
-	        });
-	      },
+	                this.mediaElement.addEventListener("timeupdate", function() {
+	                    peaks.emit("player_time_update", that.getTime());
+	                });
 
-	      setSource: function(source) {
-	        this.mediaElement.setAttribute('src', source);
-	      },
+	                this.mediaElement.addEventListener("play", function() {
+	                    peaks.emit("player_play", that.getTime());
+	                });
 
-	      getSource: function() {
-	        return this.mediaElement.src;
-	      },
+	                this.mediaElement.addEventListener("pause", function() {
+	                    peaks.emit("player_pause", that.getTime());
+	                });
 
-	      play: function () {
-	        this.mediaElement.play();
-	        peaks.emit("radio_play", this.getTime());
-	      },
+	                this.mediaElement.addEventListener("seeked", function() {
+	                    peaks.emit("player_seek", that.getTime());
+	                });
+	            },
 
-	      pause: function () {
-	        this.mediaElement.pause();
-	        peaks.emit("radio_pause", this.getTime());
-	      },
+	            setSource: function(source) {
+	                this.mediaElement.setAttribute('src', source);
+	            },
 
-	      getTime: function () {
-	        return this.mediaElement.currentTime;
-	      },
+	            getSource: function() {
+	                return this.mediaElement.src;
+	            },
 
-	      getTimeFromPercentage: function (p) {
-	        return mixins.niceTime(this.duration * p / 100, false);
-	      },
+	            play: function() {
+	                this.mediaElement.play();
+	                peaks.emit("radio_play", this.getTime());
+	            },
 
-	      getSecsFromPercentage: function (p) {
-	        return Math.floor(this.duration * p / 100);
-	      },
+	            pause: function() {
+	                this.mediaElement.pause();
+	                peaks.emit("radio_pause", this.getTime());
+	            },
 
-	      getDuration: function () {
-	        return this.mediaElement.duration;
-	      },
+	            getTime: function() {
+	                return this.mediaElement.currentTime;
+	            },
 
-	      getPercentage: function () {
-	        return this.getPercentageFromSeconds(this.mediaElement.currentTime);
-	      },
+	            getTimeFromPercentage: function(p) {
+	                return mixins.niceTime(this.duration * p / 100, false);
+	            },
 
-	      getPercentageFromSeconds: function (s) {
-	        var percentage = (s / this.duration) * 100;
-	        return Math.round(percentage * 100) / 100; // 2DP
-	      },
+	            getSecsFromPercentage: function(p) {
+	                return Math.floor(this.duration * p / 100);
+	            },
 
-	      seek: function (percentage) {
-	        this.mediaElement.currentTime = timeFromPercentage(this.duration, percentage);
-	      },
+	            getDuration: function() {
+	                return this.mediaElement.duration;
+	            },
 
-	      seekBySeconds: function (seconds) {
-	        this.mediaElement.currentTime = seconds;
-	      }
+	            getPercentage: function() {
+	                return this.getPercentageFromSeconds(this.mediaElement.currentTime);
+	            },
+
+	            getPercentageFromSeconds: function(s) {
+	                var percentage = (s / this.duration) * 100;
+	                return Math.round(percentage * 100) / 100; // 2DP
+	            },
+
+	            seek: function(percentage) {
+	                this.mediaElement.currentTime = timeFromPercentage(this.duration, percentage);
+	            },
+
+	            seekBySeconds: function(seconds) {
+	                this.mediaElement.currentTime = seconds;
+	            }
+	        };
 	    };
-	  };
 
-	  return radio;
+	    return radio;
 	}.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__), __WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
 
 
@@ -721,64 +716,64 @@
 /* 2 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_DEFINE_RESULT__;!(__WEBPACK_AMD_DEFINE_ARRAY__ = [], __WEBPACK_AMD_DEFINE_RESULT__ = function () {
-	  'use strict';
+	var __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_DEFINE_RESULT__;!(__WEBPACK_AMD_DEFINE_ARRAY__ = [], __WEBPACK_AMD_DEFINE_RESULT__ = function() {
+	    'use strict';
 
-	  var SPACE = 32,
-	    TAB = 9,
-	    LEFT_ARROW = 37,
-	    RIGHT_ARROW = 39;
+	    var SPACE = 32,
+	        TAB = 9,
+	        LEFT_ARROW = 37,
+	        RIGHT_ARROW = 39;
 
-	  function handleKeyEventGenerator(peaksInstance) {
-	    /**
-	     * Arrow keys only triggered on keydown, not keypress
-	     */
-	    return function handleKeyEvent(event){
-	      var c = event.keyCode;
-	      var t = event.type;
+	    function handleKeyEventGenerator(peaksInstance) {
+	        /**
+	         * Arrow keys only triggered on keydown, not keypress
+	         */
+	        return function handleKeyEvent(event) {
+	            var c = event.keyCode;
+	            var t = event.type;
 
-	      if (['OBJECT', 'TEXTAREA', 'INPUT', 'SELECT', 'OPTION'].indexOf(event.target.nodeName) === -1) {
+	            if (['OBJECT', 'TEXTAREA', 'INPUT', 'SELECT', 'OPTION'].indexOf(event.target.nodeName) === -1) {
 
-	        if ([SPACE, TAB, LEFT_ARROW, RIGHT_ARROW].indexOf(event.type) > -1) {
-	          event.preventDefault();
-	        }
+	                if ([SPACE, TAB, LEFT_ARROW, RIGHT_ARROW].indexOf(event.type) > -1) {
+	                    event.preventDefault();
+	                }
 
-	        if (t === "keydown" || t === "keypress") {
+	                if (t === "keydown" || t === "keypress") {
 
-	          switch (c) {
-	            case SPACE:
-	              peaksInstance.emit("kybrd_space");
-	              break;
+	                    switch (c) {
+	                        case SPACE:
+	                            peaksInstance.emit("kybrd_space");
+	                            break;
 
-	            case TAB:
-	              peaksInstance.emit("kybrd_tab");
-	              break;
-	          }
-	        } else if (t === "keyup") {
+	                        case TAB:
+	                            peaksInstance.emit("kybrd_tab");
+	                            break;
+	                    }
+	                } else if (t === "keyup") {
 
-	          switch (c) {
-	            case LEFT_ARROW:
-	              if (event.shiftKey) peaksInstance.emit("kybrd_shift_left");
-	              else peaksInstance.emit("kybrd_left");
-	              break;
+	                    switch (c) {
+	                        case LEFT_ARROW:
+	                            if (event.shiftKey) peaksInstance.emit("kybrd_shift_left");
+	                            else peaksInstance.emit("kybrd_left");
+	                            break;
 
-	            case RIGHT_ARROW:
-	              if (peaksInstance.shiftKey) peaksInstance.emit("kybrd_shift_right");
-	              else peaksInstance.emit("kybrd_right");
-	              break;
-	          }
-	        }
-	      }
-	    };
-	  }
-
-	  return {
-	    init: function (peaks) {
-	      document.addEventListener("keydown", handleKeyEventGenerator(peaks));
-	      document.addEventListener("keypress", handleKeyEventGenerator(peaks));
-	      document.addEventListener("keyup", handleKeyEventGenerator(peaks));
+	                        case RIGHT_ARROW:
+	                            if (peaksInstance.shiftKey) peaksInstance.emit("kybrd_shift_right");
+	                            else peaksInstance.emit("kybrd_right");
+	                            break;
+	                    }
+	                }
+	            }
+	        };
 	    }
-	  };
+
+	    return {
+	        init: function(peaks) {
+	            document.addEventListener("keydown", handleKeyEventGenerator(peaks));
+	            document.addEventListener("keypress", handleKeyEventGenerator(peaks));
+	            document.addEventListener("keyup", handleKeyEventGenerator(peaks));
+	        }
+	    };
 	}.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__), __WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
 
 
@@ -794,178 +789,175 @@
 	 * viewport resizing.
 	 */
 	!(__WEBPACK_AMD_DEFINE_ARRAY__ = [
-	  __webpack_require__(10),
-	  __webpack_require__(6),
-	  __webpack_require__(7),
-	  __webpack_require__(8),
-	  __webpack_require__(9)
-	  ], __WEBPACK_AMD_DEFINE_RESULT__ = function (WaveformData, WaveformOverview, WaveformZoomView, WaveformSegments, WaveformPoints) {
+	    __webpack_require__(10),
+	    __webpack_require__(6),
+	    __webpack_require__(7),
+	    __webpack_require__(8),
+	    __webpack_require__(9)
+	], __WEBPACK_AMD_DEFINE_RESULT__ = function(WaveformData, WaveformOverview, WaveformZoomView, WaveformSegments, WaveformPoints) {
 
-	  'use strict';
+	    'use strict';
 
-	  var isXhr2 = ('withCredentials' in new XMLHttpRequest());
+	    var isXhr2 = ('withCredentials' in new XMLHttpRequest());
 
-	  return function (peaks) {
-	    return {
-	      init: function (ui) {
-	        this.ui = ui; // See buildUi in main.js
-	        var that = this;
+	    return function(peaks) {
+	        return {
+	            init: function(ui) {
+	                this.ui = ui; // See buildUi in main.js
+	                var that = this;
 
-	        /**
-	         * Handle data provided by our waveform data module after parsing the XHR request
-	         * @param  {Object} origWaveformData Parsed ArrayBuffer or JSON response
-	         */
-	        that.getRemoteData(peaks.options);
-	      },
+	                /**
+	                 * Handle data provided by our waveform data module after parsing the XHR request
+	                 * @param  {Object} origWaveformData Parsed ArrayBuffer or JSON response
+	                 */
+	                that.getRemoteData(peaks.options);
+	            },
 
-	      getRemoteData: function(options){
-	        var that = this;
-	        var xhr = new XMLHttpRequest();
-	        var uri = null;
-	        var requestType = null;
-	        var builder = null;
+	            getRemoteData: function(options) {
+	                var that = this;
+	                var xhr = new XMLHttpRequest();
+	                var uri = null;
+	                var requestType = null;
+	                var builder = null;
 
-	        // Backward compatibility
-	        if (options.dataUri) {
-	          if (typeof options.dataUri === 'string') {
-	            var dataUri = {};
+	                // Backward compatibility
+	                if (options.dataUri) {
+	                    if (typeof options.dataUri === 'string') {
+	                        var dataUri = {};
 
-	            dataUri[options.dataUriDefaultFormat || 'json'] = options.dataUri;
-	            options.dataUri = dataUri;
-	          }
+	                        dataUri[options.dataUriDefaultFormat || 'json'] = options.dataUri;
+	                        options.dataUri = dataUri;
+	                    }
 
-	          if(typeof options.dataUri === 'object'){
-	            ['ArrayBuffer', 'JSON'].some(function(connector){
-	              if (window[connector]){
-	                requestType = connector.toLowerCase();
-	                uri = options.dataUri[requestType];
+	                    if (typeof options.dataUri === 'object') {
+	                        ['ArrayBuffer', 'JSON'].some(function(connector) {
+	                            if (window[connector]) {
+	                                requestType = connector.toLowerCase();
+	                                uri = options.dataUri[requestType];
 
-	                return Boolean(uri);
-	              }
-	            });
-	          }
-	        }
+	                                return Boolean(uri);
+	                            }
+	                        });
+	                    }
+	                }
 
-	        // WebAudio Builder
-	        if (!options.dataUri && WaveformData.builders.webaudio.getAudioContext()) {
-	          requestType = 'arraybuffer';
-	          uri = options.mediaElement.currentSrc || options.mediaElement.src;
-	          builder = 'webaudio';
-	        }
+	                // WebAudio Builder
+	                if (!options.dataUri && WaveformData.builders.webaudio.getAudioContext()) {
+	                    requestType = 'arraybuffer';
+	                    uri = options.mediaElement.currentSrc || options.mediaElement.src;
+	                    builder = 'webaudio';
+	                }
 
-	        if(!uri) {
-	          throw new Error("Unable to determine a compatible dataUri format for this browser.");
-	        }
+	                if (!uri) {
+	                    throw new Error("Unable to determine a compatible dataUri format for this browser.");
+	                }
 
-	        // open an XHR request to the data source file
-	        xhr.open('GET', uri, true);
+	                // open an XHR request to the data source file
+	                xhr.open('GET', uri, true);
 
-	        if(isXhr2) {
-	          try {
-	            xhr.responseType = requestType;
-	          }
-	            // some browsers like Safari 6 do handle XHR2 but not the json response type
-	            // doing only a try/catch fails in IE9
-	          catch (e){}
-	        }
+	                if (isXhr2) {
+	                    try {
+	                        xhr.responseType = requestType;
+	                    }
+	                    // some browsers like Safari 6 do handle XHR2 but not the json response type
+	                    // doing only a try/catch fails in IE9
+	                    catch (e) {}
+	                }
 
-	        xhr.onload = function(response) {
-	          if (this.readyState === 4) {
-	            if (this.status === 200) {
-	              if (builder){
-	                WaveformData.builders[builder](response.target.response, options.waveformBuilderOptions, that.handleRemoteData.bind(that, null));
-	              }
-	              else {
-	                that.handleRemoteData(null, response.target, xhr);
-	              }
+	                xhr.onload = function(response) {
+	                    if (this.readyState === 4) {
+	                        if (this.status === 200) {
+	                            if (builder) {
+	                                WaveformData.builders[builder](response.target.response, options.waveformBuilderOptions, that.handleRemoteData.bind(that, null));
+	                            } else {
+	                                that.handleRemoteData(null, response.target, xhr);
+	                            }
+	                        } else {
+	                            that.handleRemoteData(new Error('Unable to fetch remote data. HTTP Status ' + this.status));
+	                        }
+	                    }
+	                };
+
+	                xhr.send();
+	            },
+
+	            /**
+	             *
+	             * @param err {Error}
+	             * @param remoteData {WaveformData|ProgressEvent}
+	             * @param xhr {XMLHttpRequest}
+	             */
+	            handleRemoteData: function(err, remoteData, xhr) {
+	                if (err) {
+	                    return peaks.emit('error', err);
+	                }
+
+	                this.origWaveformData = null;
+
+	                try {
+	                    this.origWaveformData = remoteData instanceof WaveformData ? remoteData : WaveformData.create(remoteData);
+	                    var overviewWaveformData = this.origWaveformData.resample(this.ui.player.clientWidth);
+	                    this.waveformOverview = new WaveformOverview(overviewWaveformData, this.ui.overview, peaks);
+	                } catch (e) {
+	                    return peaks.emit('error', e);
+	                }
+
+
+	                peaks.emit("waveformOverviewReady", this.waveformOverview);
+	                this.bindResize();
+	            },
+
+	            openZoomView: function() {
+	                var that = this;
+
+	                that.waveformZoomView = new WaveformZoomView(that.origWaveformData, that.ui.zoom, peaks);
+
+	                that.segments = new WaveformSegments(peaks);
+	                that.segments.init();
+
+	                that.points = new WaveformPoints(peaks);
+	                that.points.init();
+
+	                peaks.emit('waveformZoomReady', that.waveformZoomView);
+	            },
+
+	            /**
+	             * Deal with window resize event over both waveform views.
+	             */
+	            bindResize: function() {
+	                // var that = this;
+	                //
+	                // window.addEventListener("resize", function() {
+	                //     that.ui.overview.hidden = true;
+	                //     that.ui.zoom.hidden = true;
+	                //
+	                //     if (that.resizeTimeoutId) clearTimeout(that.resizeTimeoutId);
+	                //     that.resizeTimeoutId = setTimeout(function() {
+	                //         var w = that.ui.player.clientWidth;
+	                //         var overviewWaveformData = that.origWaveformData.resample(w);
+	                //         peaks.emit("resizeEndOverview", w, overviewWaveformData);
+	                //         peaks.emit("window_resized", w, that.origWaveformData);
+	                //     }, 500);
+	                // });
+	                //
+	                // peaks.on("overview_resized", function() {
+	                //     that.ui.overview.removeAttribute('hidden');
+	                // });
+	                //
+	                // peaks.on("zoomview_resized", function() {
+	                //     that.ui.zoom.removeAttribute('hidden');
+	                // });
+	                //
+	                // peaks.on("user_seek.*", function(time) {
+	                //     peaks.player.seekBySeconds(time);
+	                // });
+	                //
+	                // peaks.on("user_scrub.*", function(time) {
+	                //     peaks.player.seekBySeconds(time);
+	                // });
 	            }
-	            else {
-	              that.handleRemoteData(new Error('Unable to fetch remote data. HTTP Status ' + this.status));
-	            }
-	          }
 	        };
-
-	        xhr.send();
-	      },
-
-	      /**
-	       *
-	       * @param err {Error}
-	       * @param remoteData {WaveformData|ProgressEvent}
-	       * @param xhr {XMLHttpRequest}
-	       */
-	      handleRemoteData: function (err, remoteData, xhr) {
-	        if (err) {
-	          return peaks.emit('error', err);
-	        }
-
-	        this.origWaveformData = null;
-
-	        try {
-	          this.origWaveformData = remoteData instanceof WaveformData ? remoteData : WaveformData.create(remoteData);
-	          var overviewWaveformData = this.origWaveformData.resample(this.ui.player.clientWidth);
-	          this.waveformOverview = new WaveformOverview(overviewWaveformData, this.ui.overview, peaks);
-	        }
-	        catch (e) {
-	          return peaks.emit('error', e);
-	        }
-
-
-	        peaks.emit("waveformOverviewReady", this.waveformOverview);
-	        this.bindResize();
-	      },
-
-	      openZoomView: function () {
-	        var that = this;
-
-	        that.waveformZoomView = new WaveformZoomView(that.origWaveformData, that.ui.zoom, peaks);
-
-	        that.segments = new WaveformSegments(peaks);
-	        that.segments.init();
-
-	        that.points = new WaveformPoints(peaks);
-	        that.points.init();
-
-	        peaks.emit('waveformZoomReady', that.waveformZoomView);
-	      },
-
-	      /**
-	       * Deal with window resize event over both waveform views.
-	       */
-	      bindResize: function () {
-	        var that = this;
-
-	        window.addEventListener("resize", function () {
-	          that.ui.overview.hidden = true;
-	          that.ui.zoom.hidden = true;
-
-	          if (that.resizeTimeoutId) clearTimeout(that.resizeTimeoutId);
-	          that.resizeTimeoutId = setTimeout(function(){
-	            var w = that.ui.player.clientWidth;
-	            var overviewWaveformData = that.origWaveformData.resample(w);
-	            peaks.emit("resizeEndOverview", w, overviewWaveformData);
-	            peaks.emit("window_resized", w, that.origWaveformData);
-	          }, 500);
-	        });
-
-	        peaks.on("overview_resized", function () {
-	          that.ui.overview.removeAttribute('hidden');
-	        });
-
-	        peaks.on("zoomview_resized", function () {
-	          that.ui.zoom.removeAttribute('hidden');
-	        });
-
-	        peaks.on("user_seek.*", function(time){
-	          peaks.player.seekBySeconds(time);
-	        });
-
-	        peaks.on("user_scrub.*", function(time){
-	          peaks.player.seekBySeconds(time);
-	        });
-	      }
 	    };
-	  };
 	}.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__), __WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
 
 
@@ -979,356 +971,355 @@
 	 * Common functions used in multiple modules are
 	 * collected here for DRY purposes.
 	 */
-	!(__WEBPACK_AMD_DEFINE_ARRAY__ = [__webpack_require__(11)], __WEBPACK_AMD_DEFINE_RESULT__ = function (Kinetic) {
-	  'use strict';
+	!(__WEBPACK_AMD_DEFINE_ARRAY__ = [__webpack_require__(11)], __WEBPACK_AMD_DEFINE_RESULT__ = function(Kinetic) {
+	    'use strict';
 
-	  // Private methods
-
-	  /**
-	   * Create a Left or Right side handle group in Kinetic based on given options.
-	   * @param  {int}      height    Height of handle group container (canvas)
-	   * @param  {string}   color     Colour hex value for handle and line marker
-	   * @param  {Boolean}  inMarker  Is this marker the inMarker (LHS) or outMarker (RHS)
-	   * @return {Function}
-	   */
-	  var createHandle = function (height, color, inMarker) {
+	    // Private methods
 
 	    /**
-	     * @param  {Boolean}  draggable If true, marker is draggable
-	     * @param  {Object}   segment   Parent segment object with in and out times
-	     * @param  {Object}   parent    Parent context
-	     * @param  {Function} onDrag    Callback after drag completed
-	     * @return {Kinetic Object}     Kinetic group object of handle marker elements
+	     * Create a Left or Right side handle group in Kinetic based on given options.
+	     * @param  {int}      height    Height of handle group container (canvas)
+	     * @param  {string}   color     Colour hex value for handle and line marker
+	     * @param  {Boolean}  inMarker  Is this marker the inMarker (LHS) or outMarker (RHS)
+	     * @return {Function}
 	     */
-	    return function (draggable, segment, parent, onDrag) {
-	      var handleHeight = 20;
-	      var handleWidth = handleHeight / 2;
-	      var handleY = (height / 2) - 10.5;
-	      var handleX = inMarker ? -handleWidth + 0.5 : 0.5;
+	    var createHandle = function(height, color, inMarker) {
 
-	      var group = new Kinetic.Group({
-	        draggable: draggable,
-	        dragBoundFunc: function(pos) {
-	          var limit;
+	        /**
+	         * @param  {Boolean}  draggable If true, marker is draggable
+	         * @param  {Object}   segment   Parent segment object with in and out times
+	         * @param  {Object}   parent    Parent context
+	         * @param  {Function} onDrag    Callback after drag completed
+	         * @return {Kinetic Object}     Kinetic group object of handle marker elements
+	         */
+	        return function(draggable, segment, parent, onDrag) {
+	            var handleHeight = 20;
+	            var handleWidth = handleHeight / 2;
+	            var handleY = (height / 2) - 10.5;
+	            var handleX = inMarker ? -handleWidth + 0.5 : 0.5;
 
-	          if (inMarker) {
-	            limit = segment.outMarker.getX() - segment.outMarker.getWidth();
-	            if (pos.x > limit) pos.x = limit;
-	          }
-	          else {
-	            limit = segment.inMarker.getX() + segment.inMarker.getWidth();
-	            if (pos.x < limit) pos.x = limit;
-	          }
+	            var group = new Kinetic.Group({
+	                draggable: draggable,
+	                dragBoundFunc: function(pos) {
+	                    var limit;
 
-	          return {
-	            x: pos.x,
-	            y: this.getAbsolutePosition().y
-	          };
-	        }
-	      }).on("dragmove", function (event) {
-	        onDrag(segment, parent);
-	      });
+	                    if (inMarker) {
+	                        limit = segment.outMarker.getX() - segment.outMarker.getWidth();
+	                        if (pos.x > limit) pos.x = limit;
+	                    } else {
+	                        limit = segment.inMarker.getX() + segment.inMarker.getWidth();
+	                        if (pos.x < limit) pos.x = limit;
+	                    }
 
-	      var xPosition = inMarker ? -24 : 24;
+	                    return {
+	                        x: pos.x,
+	                        y: this.getAbsolutePosition().y
+	                    };
+	                }
+	            }).on("dragmove", function(event) {
+	                onDrag(segment, parent);
+	            });
 
-	      var text = new Kinetic.Text({
-	        x: xPosition,
-	        y: (height / 2) - 5,
-	        text: "",
-	        fontSize: 10,
-	        fontFamily: 'sans-serif',
-	        fill: "#000",
-	        textAlign: "center"
-	      });
-	      text.hide();
-	      group.label = text;
+	            var xPosition = inMarker ? -24 : 24;
 
-	      var handle = new Kinetic.Rect({
-	        width: handleWidth,
-	        height: handleHeight,
-	        fill: color,
-	        stroke: color,
-	        strokeWidth: 1,
-	        x: handleX,
-	        y: handleY
-	      });
-
-	      /*
-	      Vertical Line
-	       */
-	      var line = new Kinetic.Line({
-	        points: [0.5, 0, 0.5, height],
-	        strokeWidth: 1,
-	        stroke: color,
-	        x: 0,
-	        y: 0
-	      });
-
-	      /*
-	      Events
-	       */
-	      handle.on("mouseover", function (event) {
-	        if (inMarker) text.setX(xPosition - text.getWidth());
-	        text.show();
-	        segment.view.segmentLayer.draw();
-	      });
-	      handle.on("mouseout", function (event) {
-	        text.hide();
-	        segment.view.segmentLayer.draw();
-	      });
-
-	      group.add(text);
-	      group.add(line);
-	      group.add(handle);
-
-	      return group;
-	    };
-	  };
-
-	  /**
-	   * Create a point handle group in Kinetic based on given options.
-	   * @param  {int}      height    Height of handle group container (canvas)
-	   * @param  {string}   color     Colour hex value for handle and line marker
-	   * @return {Function}
-	   */
-	  function createPointHandle(height, color) {
-	      /**
-	       * @param  {Boolean}  draggable If true, marker is draggable
-	       * @param  {Object}   point     Parent point object with in times
-	       * @param  {Object}   parent    Parent context
-	       * @param  {Function} onDrag    Callback after drag completed
-	       * @return {Kinetic Object}     Kinetic group object of handle marker elements
-	       */
-	      return function (draggable, point, parent, onDrag, onDblClick, onDragEnd) {
-	          var handleTop = (height / 2) - 10.5;
-	          var handleWidth = 10;
-	          var handleHeight = 20;
-	          var handleX = 0.5; //Place in the middle of the marker
-
-	          var group = new Kinetic.Group({
-	              draggable: draggable,
-	              dragBoundFunc: function(pos) {
-
-	                  return {
-	                      x: pos.x, //No constraint hoziontally
-	                      y: this.getAbsolutePosition().y //Constrained vertical line
-	                  };
-	              }
-	          }).on("dragmove", function (event) {
-	                  onDrag(point, parent);
-	              });
-
-	          if(onDblClick) {
-	              group.on('dblclick', function (event) {
-	                  onDblClick(parent);
-	              });
-	          }
-
-	          if(onDragEnd) {
-	              group.on('dragend', function (event) {
-	                  onDragEnd(parent);
-	              });
-	          }
-
-	          //Place text to the left of the mark
-	          var xPosition = -handleWidth;
-
-	          var text = new Kinetic.Text({
-	              x: xPosition,
-	              y: (height / 2) - 5,
-	              text: "",
-	              fontSize: 10,
-	              fontFamily: 'sans-serif',
-	              fill: "#000",
-	              textAlign: "center"
-	          });
-	          text.hide();
-	          group.label = text;
-
-	          /*
-	          Handle
-	           */
-	          var handle = new Kinetic.Rect({
-	            width: handleWidth,
-	            height: handleHeight,
-	            fill: color,
-	            x: handleX,
-	            y: handleTop
-	          });
-
-	          /*
-	          Line
-	           */
-	          var line = new Kinetic.Line({
-	            points: [0, 0, 0, height],
-	            stroke: color,
-	            strokeWidth: 1,
-	            x: handleX,
-	            y: 0
-	          });
-
-	          /*
-	          Events
-	           */
-	          handle.on("mouseover", function (event) {
-	            text.show();
-	            text.setX(xPosition - text.getWidth()); //Position text to the left of the mark
-	            point.view.pointLayer.draw();
-	          });
-	          handle.on("mouseout", function (event) {
+	            var text = new Kinetic.Text({
+	                x: xPosition,
+	                y: (height / 2) - 5,
+	                text: "",
+	                fontSize: 10,
+	                fontFamily: 'sans-serif',
+	                fill: "#000",
+	                textAlign: "center"
+	            });
 	            text.hide();
-	            point.view.pointLayer.draw();
-	          });
+	            group.label = text;
 
-	          group.add(handle);
-	          group.add(line);
-	          group.add(text);
+	            var handle = new Kinetic.Rect({
+	                width: handleWidth,
+	                height: handleHeight,
+	                fill: color,
+	                stroke: color,
+	                strokeWidth: 1,
+	                x: handleX,
+	                y: handleY
+	            });
 
-	          return group;
+	            /*
+	            Vertical Line
+	             */
+	            var line = new Kinetic.Line({
+	                points: [0.5, 0, 0.5, height],
+	                strokeWidth: 1,
+	                stroke: color,
+	                x: 0,
+	                y: 0
+	            });
 
-	      };
-	  }
+	            /*
+	            Events
+	             */
+	            handle.on("mouseover", function(event) {
+	                if (inMarker) text.setX(xPosition - text.getWidth());
+	                text.show();
+	                segment.view.segmentLayer.draw();
+	            });
+	            handle.on("mouseout", function(event) {
+	                text.hide();
+	                segment.view.segmentLayer.draw();
+	            });
 
-	  /**
-	   * Draw a waveform on a canvas context
-	   * @param  {Kinetic.Context}  ctx   Canvas Context to draw on
-	   * @param  {Array}    min           Min values for waveform
-	   * @param  {Array}    max           Max values for waveform
-	   * @param  {Int}      offset_start  Where to start drawing
-	   * @param  {Int}      offset_length How much to draw
-	   * @param  {Function} y             Calculate height (see fn interpolateHeight)
-	   */
-	  function drawWaveform(ctx, min, max, offset_start, offset_length, y) {
-	    ctx.beginPath();
+	            group.add(text);
+	            group.add(line);
+	            group.add(handle);
 
-	    min.forEach(function(val, x){
-	      ctx.lineTo(offset_start + x + 0.5, y(val) + 0.5);
-	    });
-
-	    max.reverse().forEach(function(val, x){
-	      ctx.lineTo(offset_start + (offset_length - x) + 0.5, y(val) + 0.5);
-	    });
-
-	    ctx.closePath();
-	  }
-
-	  /**
-	   * Returns a height interpolator function
-	   *
-	   * @param {Number} total_height
-	   * @returns {interpolateHeight}
-	   */
-	  function interpolateHeightGenerator (total_height){
-	    var amplitude = 256;
-	    return function interpolateHeight (size){
-	      return total_height - ((size + 128) * total_height) / amplitude;
+	            return group;
+	        };
 	    };
-	  }
-
-	  // Public API
-	  return {
-
-	    interpolateHeight: interpolateHeightGenerator,
-
-	    drawWaveform: drawWaveform,
 
 	    /**
-	     *
-	     * @this {Kinetic.Shape}
-	     * @param {WaveformOverview} view
-	     * @param {Kinetic.Context} context
+	     * Create a point handle group in Kinetic based on given options.
+	     * @param  {int}      height    Height of handle group container (canvas)
+	     * @param  {string}   color     Colour hex value for handle and line marker
+	     * @return {Function}
 	     */
-	    waveformDrawFunction: function (view, context) {
-	      var waveform = view.intermediateData || view.data;
-	      var y = interpolateHeightGenerator(view.height);
-	      var offset_length = waveform.offset_length;
+	    function createPointHandle(height, color) {
+	        /**
+	         * @param  {Boolean}  draggable If true, marker is draggable
+	         * @param  {Object}   point     Parent point object with in times
+	         * @param  {Object}   parent    Parent context
+	         * @param  {Function} onDrag    Callback after drag completed
+	         * @return {Kinetic Object}     Kinetic group object of handle marker elements
+	         */
+	        return function(draggable, point, parent, onDrag, onDblClick, onDragEnd) {
+	            var handleTop = (height / 2) - 10.5;
+	            var handleWidth = 10;
+	            var handleHeight = 20;
+	            var handleX = 0.5; //Place in the middle of the marker
 
-	      drawWaveform(context, waveform.min, waveform.max, 0, offset_length, y);
-	      context.fillStrokeShape(this);
-	    },
+	            var group = new Kinetic.Group({
+	                draggable: draggable,
+	                dragBoundFunc: function(pos) {
 
-	    waveformOverviewMarkerDrawFunction: function(xIndex, viewGroup, view) {
-	      viewGroup.waveformShape.setPoints([xIndex, 0, xIndex, view.height]);
-	    },
+	                    return {
+	                        x: pos.x, //No constraint hoziontally
+	                        y: this.getAbsolutePosition().y //Constrained vertical line
+	                    };
+	                }
+	            }).on("dragmove", function(event) {
+	                onDrag(point, parent);
+	            });
 
-	    /**
-	     * Format a time nicely
-	     * @param  {int}      time            Time in seconds to be formatted
-	     * @param  {Boolean}  dropHundredths  Don't display hundredths of a second if true
-	     * @return {String}   Formatted time string
-	     */
-	    niceTime: function (time, dropHundredths) {
-	      var hundredths, seconds, minutes, hours, result = [];
+	            if (onDblClick) {
+	                group.on('dblclick', function(event) {
+	                    onDblClick(parent);
+	                });
+	            }
 
-	      hundredths = Math.floor((time % 1) * 100);
-	      seconds = Math.floor(time);
-	      minutes = Math.floor(seconds / 60);
-	      hours = Math.floor(minutes / 60);
+	            if (onDragEnd) {
+	                group.on('dragend', function(event) {
+	                    onDragEnd(parent);
+	                });
+	            }
 
-	      if (hours>0) result.push(hours); // Hours
-	      result.push(minutes % 60); // Mins
-	      result.push(seconds % 60); // Seconds
+	            //Place text to the left of the mark
+	            var xPosition = -handleWidth;
 
-	      for (var i = 0; i < result.length; i++) {
-	        var x = result[i];
-	        if (x < 10) {
-	          result[i] = "0" + x;
-	        } else {
-	          result[i] = x;
-	        }
-	      }
+	            var text = new Kinetic.Text({
+	                x: xPosition,
+	                y: (height / 2) - 5,
+	                text: "",
+	                fontSize: 10,
+	                fontFamily: 'sans-serif',
+	                fill: "#000",
+	                textAlign: "center"
+	            });
+	            text.hide();
+	            group.label = text;
 
-	      result = result.join(":");
+	            /*
+	            Handle
+	             */
+	            var handle = new Kinetic.Rect({
+	                width: handleWidth,
+	                height: handleHeight,
+	                fill: color,
+	                x: handleX,
+	                y: handleTop
+	            });
 
-	      if (!dropHundredths) {
-	        if (hundredths < 10) {
-	          hundredths = "0" + hundredths;
-	        }
+	            /*
+	            Line
+	             */
+	            var line = new Kinetic.Line({
+	                points: [0, 0, 0, height],
+	                stroke: color,
+	                strokeWidth: 1,
+	                x: handleX,
+	                y: 0
+	            });
 
-	        result += "." + hundredths; // Hundredths of a second
-	      }
+	            /*
+	            Events
+	             */
+	            handle.on("mouseover", function(event) {
+	                text.show();
+	                text.setX(xPosition - text.getWidth()); //Position text to the left of the mark
+	                point.view.pointLayer.draw();
+	            });
+	            handle.on("mouseout", function(event) {
+	                text.hide();
+	                point.view.pointLayer.draw();
+	            });
 
-	      return result;
-	    },
+	            group.add(handle);
+	            group.add(line);
+	            group.add(text);
 
-	    /**
-	     * Return a function that on execution creates and returns a new
-	     * IN handle object
-	     * @param  {Object}   options Root Peaks.js options containing config info for handle
-	     * @return {Function} Provides Kinetic handle group on execution
-	     */
-	    defaultInMarker: function (options) {
-	      return createHandle(options.height, options.outMarkerColor, true);
-	    },
+	            return group;
 
-	    /**
-	     * Return a function that on execution creates and returns a new
-	     * OUT handle object
-	     * @param  {Object}   options Root Peaks.js options containing config info for handle
-	     * @return {Function} Provides Kinetic handle group on execution
-	     */
-	    defaultOutMarker: function (options) {
-	      return createHandle(options.height, options.outMarkerColor, false);
-	    },
-
-	    defaultPointMarker: function (options) {
-	      return createPointHandle(options.height, options.pointMarkerColor);
-	    },
-
-	    defaultSegmentLabelDraw: function (options) {
-	      return function (segment, parent) {
-	        return new Kinetic.Text({
-	          x: 12,
-	          y: 12,
-	          text: parent.labelText,
-	          fontSize: 12,
-	          fontFamily: 'Arial, sans-serif',
-	          fill: "#000",
-	          textAlign: "center"
-	        });
-	      };
+	        };
 	    }
-	  };
+
+	    /**
+	     * Draw a waveform on a canvas context
+	     * @param  {Kinetic.Context}  ctx   Canvas Context to draw on
+	     * @param  {Array}    min           Min values for waveform
+	     * @param  {Array}    max           Max values for waveform
+	     * @param  {Int}      offset_start  Where to start drawing
+	     * @param  {Int}      offset_length How much to draw
+	     * @param  {Function} y             Calculate height (see fn interpolateHeight)
+	     */
+	    function drawWaveform(ctx, min, max, offset_start, offset_length, y) {
+	        ctx.beginPath();
+
+	        min.forEach(function(val, x) {
+	            ctx.lineTo(offset_start + x + 0.5, y(val) + 0.5);
+	        });
+
+	        max.reverse().forEach(function(val, x) {
+	            ctx.lineTo(offset_start + (offset_length - x) + 0.5, y(val) + 0.5);
+	        });
+
+	        ctx.closePath();
+	    }
+
+	    /**
+	     * Returns a height interpolator function
+	     *
+	     * @param {Number} total_height
+	     * @returns {interpolateHeight}
+	     */
+	    function interpolateHeightGenerator(total_height) {
+	        var amplitude = 256;
+	        return function interpolateHeight(size) {
+	            return total_height - ((size + 128) * total_height) / amplitude;
+	        };
+	    }
+
+	    // Public API
+	    return {
+
+	        interpolateHeight: interpolateHeightGenerator,
+
+	        drawWaveform: drawWaveform,
+
+	        /**
+	         *
+	         * @this {Kinetic.Shape}
+	         * @param {WaveformOverview} view
+	         * @param {Kinetic.Context} context
+	         */
+	        waveformDrawFunction: function(view, context) {
+	            var waveform = view.intermediateData || view.data;
+	            var y = interpolateHeightGenerator(view.height);
+	            var offset_length = waveform.offset_length;
+
+	            drawWaveform(context, waveform.min, waveform.max, 0, offset_length, y);
+	            context.fillStrokeShape(this);
+	        },
+
+	        waveformOverviewMarkerDrawFunction: function(xIndex, viewGroup, view) {
+	            viewGroup.waveformShape.setPoints([xIndex, 0, xIndex, view.height]);
+	        },
+
+	        /**
+	         * Format a time nicely
+	         * @param  {int}      time            Time in seconds to be formatted
+	         * @param  {Boolean}  dropHundredths  Don't display hundredths of a second if true
+	         * @return {String}   Formatted time string
+	         */
+	        niceTime: function(time, dropHundredths) {
+	            var hundredths, seconds, minutes, hours, result = [];
+
+	            hundredths = Math.floor((time % 1) * 100);
+	            seconds = Math.floor(time);
+	            minutes = Math.floor(seconds / 60);
+	            hours = Math.floor(minutes / 60);
+
+	            if (hours > 0) result.push(hours); // Hours
+	            result.push(minutes % 60); // Mins
+	            result.push(seconds % 60); // Seconds
+
+	            for (var i = 0; i < result.length; i++) {
+	                var x = result[i];
+	                if (x < 10) {
+	                    result[i] = "0" + x;
+	                } else {
+	                    result[i] = x;
+	                }
+	            }
+
+	            result = result.join(":");
+
+	            if (!dropHundredths) {
+	                if (hundredths < 10) {
+	                    hundredths = "0" + hundredths;
+	                }
+
+	                result += "." + hundredths; // Hundredths of a second
+	            }
+
+	            return result;
+	        },
+
+	        /**
+	         * Return a function that on execution creates and returns a new
+	         * IN handle object
+	         * @param  {Object}   options Root Peaks.js options containing config info for handle
+	         * @return {Function} Provides Kinetic handle group on execution
+	         */
+	        defaultInMarker: function(options) {
+	            return createHandle(options.height, options.outMarkerColor, true);
+	        },
+
+	        /**
+	         * Return a function that on execution creates and returns a new
+	         * OUT handle object
+	         * @param  {Object}   options Root Peaks.js options containing config info for handle
+	         * @return {Function} Provides Kinetic handle group on execution
+	         */
+	        defaultOutMarker: function(options) {
+	            return createHandle(options.height, options.outMarkerColor, false);
+	        },
+
+	        defaultPointMarker: function(options) {
+	            return createPointHandle(options.height, options.pointMarkerColor);
+	        },
+
+	        defaultSegmentLabelDraw: function(options) {
+	            return function(segment, parent) {
+	                return new Kinetic.Text({
+	                    x: 12,
+	                    y: 12,
+	                    text: parent.labelText,
+	                    fontSize: 12,
+	                    fontFamily: 'Arial, sans-serif',
+	                    fill: "#000",
+	                    textAlign: "center"
+	                });
+	            };
+	        }
+	    };
 	}.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__), __WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
 
 
@@ -1924,205 +1915,207 @@
 	 *
 	 */
 	!(__WEBPACK_AMD_DEFINE_ARRAY__ = [
-	  __webpack_require__(12),
-	  __webpack_require__(4),
-	  __webpack_require__(11)
-	  ], __WEBPACK_AMD_DEFINE_RESULT__ = function (WaveformAxis, mixins, Kinetic) {
-	  'use strict';
+	    __webpack_require__(12),
+	    __webpack_require__(4),
+	    __webpack_require__(11)
+	], __WEBPACK_AMD_DEFINE_RESULT__ = function(WaveformAxis, mixins, Kinetic) {
+	    'use strict';
 
-	  function WaveformOverview(waveformData, container, peaks) {
-	    var that = this;
+	    function WaveformOverview(waveformData, container, peaks) {
+	        var that = this;
 
-	    that.peaks = peaks;
-	    that.options = peaks.options;
-	    that.data = waveformData;
-	    that.width = container.clientWidth;
-	    that.height = container.clientHeight || that.options.height;
-	    that.frameOffset = 0;
+	        that.peaks = peaks;
+	        that.options = peaks.options;
+	        that.data = waveformData;
+	        that.width = container.clientWidth;
+	        that.height = container.clientHeight || that.options.height;
+	        that.frameOffset = 0;
 
-	    that.stage = new Kinetic.Stage({
-	      container: container,
-	      width: that.width,
-	      height: that.height
-	    });
+	        that.stage = new Kinetic.Stage({
+	            container: container,
+	            width: that.width,
+	            height: that.height
+	        });
 
-	    that.waveformLayer = new Kinetic.Layer();
+	        that.waveformLayer = new Kinetic.Layer();
 
-	    that.background = new Kinetic.Rect({
-	      x: 0,
-	      y: 0,
-	      width: that.width,
-	      height: that.height
-	    });
+	        that.background = new Kinetic.Rect({
+	            x: 0,
+	            y: 0,
+	            width: that.width,
+	            height: that.height
+	        });
 
-	    that.waveformLayer.add(that.background);
+	        that.waveformLayer.add(that.background);
 
-	    that.createWaveform();
-	    that.createRefWaveform();
-	    that.createUi();
+	        that.createWaveform();
+	        that.createRefWaveform();
+	        that.createUi();
 
-	    that.stage.add(that.waveformLayer);
+	        that.stage.add(that.waveformLayer);
 
-	    // INTERACTION ===============================================
-	    var cancelSeeking = function(){
-	      that.stage.off("mousemove mouseup");
-	      peaks.seeking = false;
-	    };
+	        // INTERACTION ===============================================
+	        var cancelSeeking = function() {
+	            that.stage.off("mousemove mouseup");
+	            peaks.seeking = false;
+	        };
 
-	    that.stage.on("mousedown", function (event) {
-	      if (event.target &&
-	        !event.target.attrs.draggable &&
-	        !event.target.parent.attrs.draggable) {
-	        if (event.type == "mousedown") {
-	          peaks.seeking = true;
+	        that.stage.on("mousedown", function(event) {
+	            if (event.target &&
+	                !event.target.attrs.draggable &&
+	                !event.target.parent.attrs.draggable) {
+	                if (event.type == "mousedown") {
+	                    peaks.seeking = true;
 
-	          peaks.emit("user_seek.overview", that.data.time(event.evt.layerX), event.evt.layerX);
+	                    peaks.emit("user_seek.overview", that.data.time(event.evt.layerX), event.evt.layerX);
 
-	          that.stage.on("mousemove", function (event) {
-	            peaks.emit("user_scrub.overview", that.data.time(event.evt.layerX), event.evt.layerX);
-	          });
+	                    that.stage.on("mousemove", function(event) {
+	                        peaks.emit("user_scrub.overview", that.data.time(event.evt.layerX), event.evt.layerX);
+	                    });
 
-	          that.stage.on("mouseup", cancelSeeking);
-	        } else {
-	          cancelSeeking();
+	                    that.stage.on("mouseup", cancelSeeking);
+	                } else {
+	                    cancelSeeking();
+	                }
+	            }
+	        });
+
+	        // EVENTS ====================================================
+
+	        function trackPlayheadPosition(time, frame) {
+	            if (!peaks.seaking) {
+	                that.playheadPixel = that.data.at_time(time);
+	                that.updateUi(that.playheadPixel);
+	            }
 	        }
-	      }
-	    });
 
-	    // EVENTS ====================================================
+	        peaks.on("player_time_update", trackPlayheadPosition);
+	        peaks.on("user_seek.*", trackPlayheadPosition);
+	        peaks.on("user_scrub.*", trackPlayheadPosition);
 
-	    function trackPlayheadPosition(time, frame){
-	      if (!peaks.seaking) {
-	        that.playheadPixel = that.data.at_time(time);
-	        that.updateUi(that.playheadPixel);
-	      }
+	        peaks.on("waveform_zoom_displaying", function(start, end) {
+	            that.updateRefWaveform(start, end);
+	        });
+
+	        peaks.on("resizeEndOverview", function(width, newWaveformData) {
+	            that.width = width;
+	            that.data = newWaveformData;
+	            that.stage.setWidth(that.width);
+	            //that.updateWaveform();
+	            peaks.emit("overview_resized");
+	        });
 	    }
 
-	    peaks.on("player_time_update", trackPlayheadPosition);
-	    peaks.on("user_seek.*", trackPlayheadPosition);
-	    peaks.on("user_scrub.*", trackPlayheadPosition);
+	    WaveformOverview.prototype.createWaveform = function() {
+	        var that = this;
+	        this.waveformShape = new Kinetic.Shape({
+	            fill: that.options.overviewWaveformColor,
+	            strokeWidth: 0
+	        });
 
-	    peaks.on("waveform_zoom_displaying", function (start, end) {
-	      that.updateRefWaveform(start, end);
-	    });
+	        this.waveformShape.setDrawFunc(mixins.waveformDrawFunction.bind(this.waveformShape, that));
 
-	    peaks.on("resizeEndOverview", function (width, newWaveformData) {
-	      that.width = width;
-	      that.data = newWaveformData;
-	      that.stage.setWidth(that.width);
-	      //that.updateWaveform();
-	      peaks.emit("overview_resized");
-	    });
-	  }
+	        this.waveformLayer.add(this.waveformShape);
+	        this.stage.add(this.waveformLayer);
+	    };
 
-	  WaveformOverview.prototype.createWaveform = function() {
-	    var that = this;
-	    this.waveformShape = new Kinetic.Shape({
-	      fill: that.options.overviewWaveformColor,
-	      strokeWidth: 0
-	    });
+	    //Green Reference Waveform to inform users where they are in overview waveform based on current zoom level
+	    WaveformOverview.prototype.createRefWaveform = function() {
+	        var that = this;
 
-	    this.waveformShape.setDrawFunc(mixins.waveformDrawFunction.bind(this.waveformShape, that));
+	        this.refLayer = new Kinetic.Layer();
 
-	    this.waveformLayer.add(this.waveformShape);
-	    this.stage.add(this.waveformLayer);
-	  };
+	        /*this.refWaveformShape = new Kinetic.Shape({
+	          drawFunc: function(canvas) {
+	            mixins.waveformDrawFunction.call(this, that.data, canvas, mixins.interpolateHeight(that.height));
+	          },
+	          fill: that.options.zoomWaveformColor,
+	          strokeWidth: 0
+	        });*/
 
-	  //Green Reference Waveform to inform users where they are in overview waveform based on current zoom level
-	  WaveformOverview.prototype.createRefWaveform = function () {
-	    var that = this;
+	        this.refWaveformRect = new Kinetic.Rect({
+	            x: 0,
+	            y: 11,
+	            width: 0,
+	            stroke: "grey",
+	            strokeWidth: 1,
+	            height: this.height - (11 * 2),
+	            fill: 'grey',
+	            opacity: 0.3,
+	            cornerRadius: 2
+	        });
 
-	    this.refLayer = new Kinetic.Layer();
+	        this.refLayer.add(this.refWaveformRect);
+	        this.stage.add(this.refLayer);
+	    };
 
-	    /*this.refWaveformShape = new Kinetic.Shape({
-	      drawFunc: function(canvas) {
+	    WaveformOverview.prototype.createUi = function() {
+	        var that = this;
+
+	        this.playheadLine = new Kinetic.Line({
+	            points: [0.5, 0, 0.5, that.height],
+	            stroke: that.options.playheadColor,
+	            strokeWidth: 1,
+	            x: 0
+	        });
+
+	        that.uiLayer = new Kinetic.Layer({
+	            index: 100
+	        });
+	        that.axis = new WaveformAxis(that);
+
+	        this.uiLayer.add(this.playheadLine);
+	        this.stage.add(this.uiLayer);
+	    };
+
+	    /*WaveformOverview.prototype.updateWaveform = function () {
+	      var that = this;
+	      that.waveformShape.setDrawFunc(function(canvas) {
 	        mixins.waveformDrawFunction.call(this, that.data, canvas, mixins.interpolateHeight(that.height));
-	      },
-	      fill: that.options.zoomWaveformColor,
-	      strokeWidth: 0
-	    });*/
+	      });
+	      that.waveformLayer.draw();
+	    };
 
-	    this.refWaveformRect = new Kinetic.Rect({
-	      x: 0,
-	      y: 11,
-	      width: 0,
-	      stroke: "grey",
-	      strokeWidth: 1,
-	      height: this.height - (11*2),
-	      fill: 'grey',
-	      opacity: 0.3,
-	      cornerRadius: 2
-	    });
+	    WaveformOverview.prototype.updateRefWaveform = function (time_in, time_out) {
+	      var that = this;
 
-	    this.refLayer.add(this.refWaveformRect);
-	    this.stage.add(this.refLayer);
-	  };
+	      var offset_in = that.data.at_time(time_in);
+	      var offset_out = that.data.at_time(time_out);
 
-	  WaveformOverview.prototype.createUi = function() {
-	    var that = this;
+	      that.refWaveformShape.setDrawFunc(function(canvas) {
+	        that.data.set_segment(offset_in, offset_out, "zoom");
 
-	    this.playheadLine = new Kinetic.Line({
-	      points: [0.5, 0, 0.5, that.height],
-	      stroke: that.options.playheadColor,
-	      strokeWidth: 1,
-	      x: 0
-	    });
+	        mixins.waveformOffsetDrawFunction.call(this, that.data, canvas, mixins.interpolateHeight(that.height));
+	      });
 
-	    that.uiLayer = new Kinetic.Layer({ index: 100 });
-	    that.axis = new WaveformAxis(that);
+	      that.refWaveformShape.setWidth(that.data.at_time(time_out) - that.data.at_time(time_in));
+	      that.refLayer.draw();
+	    };*/
 
-	    this.uiLayer.add(this.playheadLine);
-	    this.stage.add(this.uiLayer);
-	  };
+	    WaveformOverview.prototype.updateRefWaveform = function(time_in, time_out) {
+	        var that = this;
 
-	  /*WaveformOverview.prototype.updateWaveform = function () {
-	    var that = this;
-	    that.waveformShape.setDrawFunc(function(canvas) {
-	      mixins.waveformDrawFunction.call(this, that.data, canvas, mixins.interpolateHeight(that.height));
-	    });
-	    that.waveformLayer.draw();
-	  };
+	        var offset_in = that.data.at_time(time_in);
+	        var offset_out = that.data.at_time(time_out);
 
-	  WaveformOverview.prototype.updateRefWaveform = function (time_in, time_out) {
-	    var that = this;
+	        that.data.set_segment(offset_in, offset_out, "zoom");
 
-	    var offset_in = that.data.at_time(time_in);
-	    var offset_out = that.data.at_time(time_out);
+	        that.refWaveformRect.setAttrs({
+	            x: that.data.segments.zoom.offset_start - that.data.offset_start,
+	            width: that.data.at_time(time_out) - that.data.at_time(time_in)
+	        });
 
-	    that.refWaveformShape.setDrawFunc(function(canvas) {
-	      that.data.set_segment(offset_in, offset_out, "zoom");
+	        that.refLayer.draw();
+	    };
 
-	      mixins.waveformOffsetDrawFunction.call(this, that.data, canvas, mixins.interpolateHeight(that.height));
-	    });
+	    WaveformOverview.prototype.updateUi = function(pixel) {
+	        var that = this;
 
-	    that.refWaveformShape.setWidth(that.data.at_time(time_out) - that.data.at_time(time_in));
-	    that.refLayer.draw();
-	  };*/
+	        that.playheadLine.setAttr("x", pixel);
+	        that.uiLayer.draw();
+	    };
 
-	  WaveformOverview.prototype.updateRefWaveform = function (time_in, time_out) {
-	    var that = this;
-
-	    var offset_in = that.data.at_time(time_in);
-	    var offset_out = that.data.at_time(time_out);
-
-	    that.data.set_segment(offset_in, offset_out, "zoom");
-
-	    that.refWaveformRect.setAttrs({
-	      x: that.data.segments.zoom.offset_start - that.data.offset_start,
-	      width: that.data.at_time(time_out) - that.data.at_time(time_in)
-	    });
-
-	    that.refLayer.draw();
-	  };
-
-	  WaveformOverview.prototype.updateUi = function (pixel) {
-	    var that = this;
-
-	    that.playheadLine.setAttr("x", pixel);
-	    that.uiLayer.draw();
-	  };
-
-	  return WaveformOverview;
+	    return WaveformOverview;
 	}.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__), __WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
 
 
@@ -2139,323 +2132,330 @@
 	 *
 	 */
 	!(__WEBPACK_AMD_DEFINE_ARRAY__ = [
-	  __webpack_require__(12),
-	  __webpack_require__(4),
-	  __webpack_require__(14),
-	  __webpack_require__(11)
-	  ], __WEBPACK_AMD_DEFINE_RESULT__ = function (WaveformAxis, mixins, ZoomAnimation, Kinetic) {
-	  'use strict';
+	    __webpack_require__(12),
+	    __webpack_require__(4),
+	    __webpack_require__(13),
+	    __webpack_require__(11)
+	], __WEBPACK_AMD_DEFINE_RESULT__ = function(WaveformAxis, mixins, ZoomAnimation, Kinetic) {
+	    'use strict';
 
-	  function WaveformZoomView(waveformData, container, peaks) {
-	    var that = this;
+	    function WaveformZoomView(waveformData, container, peaks) {
+	        var that = this;
 
-	    that.cur_scale = 0;
+	        that.cur_scale = 0;
 
-	    that.peaks = peaks;
-	    that.options = peaks.options;
-	    that.rootData = waveformData;
+	        that.peaks = peaks;
+	        that.options = peaks.options;
+	        that.rootData = waveformData;
 
-	    that.playing = false;
+	        that.playing = false;
 
-	    that.intermediateData = null;
-	    that.data = that.rootData.resample({
-	      scale: that.options.zoomLevels[peaks.zoom.getZoom()]
-	    });
-	    that.playheadPixel = that.data.at_time(that.options.mediaElement.currentTime);
-	    that.pixelLength = that.data.adapter.length;
-	    that.frameOffset = 0; // the pixel offset of the current frame being displayed
-
-	    that.width = container.clientWidth;
-	    that.height = container.clientHeight || that.options.height;
-
-	    that.data.offset(that.frameOffset, that.frameOffset + that.width);
-
-	    that.stage = new Kinetic.Stage({
-	      container: container,
-	      width: that.width,
-	      height: that.height
-	    });
-
-	    that.zoomWaveformLayer = new Kinetic.Layer();
-	    that.uiLayer = new Kinetic.Layer();
-
-	    that.background = new Kinetic.Rect({
-	      x: 0,
-	      y: 0,
-	      width: that.width,
-	      height: that.height
-	    });
-
-	    that.zoomWaveformLayer.add(that.background);
-
-	    that.axis = new WaveformAxis(that);
-
-	    that.createZoomWaveform();
-	    that.createUi();
-
-	    // INTERACTION ===============================================
-
-	    that.stage.on("mousedown", function (event) {
-	      if (event.target &&
-	        !event.target.attrs.draggable &&
-	        !event.target.parent.attrs.draggable) {
-	        if (event.type === "mousedown") {
-	          var x = event.evt.layerX, dX, p;
-	          peaks.seeking = true;
-
-	          // enable drag if necessary
-	          that.stage.on("mousemove", function (event) {
-	            peaks.seeking = false;
-
-	            dX = event.evt.layerX > x ? x - event.evt.layerX : (x - event.evt.layerX)*1;
-	            x = event.evt.layerX;
-	            p = that.frameOffset+dX;
-	            p = p < 0 ? 0 : p > (that.pixelLength - that.width) ? (that.pixelLength - that.width) : p;
-
-	            that.updateZoomWaveform(p);
-	          });
-
-	          that.stage.on("mouseup", function () {
-	            if (peaks.seeking){
-	              // Set playhead position only on click release, when not dragging
-	              that.peaks.emit("user_seek.zoomview", that.data.time(that.frameOffset + x), that.frameOffset + x);
-	            }
-
-	            that.stage.off("mousemove mouseup");
-	            peaks.seeking = false;
-	          });
-	        }
-	      }
-	    });
-
-	    // EVENTS ====================================================
-
-	    var userSeekHandler = function userSeekHandler (options, time) {
-	      options = options || { withOffset: true };
-	      var frameIndex = that.data.at_time(time);
-
-	      that.seekFrame(frameIndex, options.withOffset ? Math.round(that.width / 2) : 0);
-
-	      if (that.playing){
-	        that.playFrom(time, frameIndex);
-	      }
-	    };
-
-	    that.peaks.on("player_time_update", function (time) {
-	      if (!peaks.seeking) {
-	        that.seekFrame(that.data.at_time(time));
-	      }
-	    });
-
-	    that.peaks.on("player_seek", userSeekHandler.bind(null, { withOffset: true }));
-	    that.peaks.on("user_seek.*", userSeekHandler.bind(null, { withOffset: true }));
-	    that.peaks.on("user_scrub.*", userSeekHandler.bind(null, { withOffset: false }));
-
-	    that.peaks.on("player_play", function (time) {
-	      that.playing = true;
-	      that.playFrom(time, that.data.at_time(time));
-	    });
-
-	    that.peaks.on("player_pause", function (time) {
-	      that.playing = false;
-
-	      if (that.playheadLineAnimation) {
-	        that.playheadLineAnimation.stop();
-	      }
-
-	      that.syncPlayhead(that.data.at_time(time));
-	    });
-
-	    that.peaks.on("zoom.update", function (current_scale, previous_scale) {
-	      if (that.playing) {
-	        return;
-	      }
-
-	      if (current_scale !== previous_scale) {
+	        that.intermediateData = null;
 	        that.data = that.rootData.resample({
-	          scale: current_scale
+	            scale: that.options.zoomLevels[peaks.zoom.getZoom()]
+	        });
+	        that.playheadPixel = that.data.at_time(that.options.mediaElement.currentTime);
+	        that.pixelLength = that.data.adapter.length;
+	        that.frameOffset = 0; // the pixel offset of the current frame being displayed
+
+	        that.width = container.clientWidth;
+	        that.height = container.clientHeight || that.options.height;
+
+	        that.data.offset(that.frameOffset, that.frameOffset + that.width);
+
+	        that.stage = new Kinetic.Stage({
+	            container: container,
+	            width: that.width,
+	            height: that.height
 	        });
 
-	        var animation = ZoomAnimation.init(current_scale, previous_scale, that);
-	        animation.start();
-	      }
-	    });
+	        that.zoomWaveformLayer = new Kinetic.Layer();
+	        that.uiLayer = new Kinetic.Layer();
 
-	    that.peaks.on("window_resized", function (width, newWaveformData) {
-	      that.width = width;
-	      that.data = newWaveformData;
-	      that.stage.setWidth(that.width);
-	      that.updateZoomWaveform(that.frameOffset);
-	      that.peaks.emit("zoomview_resized");
-	    });
+	        that.background = new Kinetic.Rect({
+	            x: 0,
+	            y: 0,
+	            width: that.width,
+	            height: that.height
+	        });
 
-	    // KEYBOARD EVENTS =========================================
-	    var nudgeFrame = function nudgeFrame(step){
-	      var time = that.options.mediaElement.currentTime;
+	        that.zoomWaveformLayer.add(that.background);
 
-	      time += (that.options.nudgeIncrement * step);
-	      that.seekFrame(that.data.at_time(time));
+	        that.axis = new WaveformAxis(that);
+
+	        that.createZoomWaveform();
+	        that.createUi();
+
+	        // INTERACTION ===============================================
+
+	        that.stage.on("mousedown", function(event) {
+	            if (event.target &&
+	                !event.target.attrs.draggable &&
+	                !event.target.parent.attrs.draggable) {
+	                if (event.type === "mousedown") {
+	                    var x = event.evt.layerX,
+	                        dX, p;
+	                    peaks.seeking = true;
+
+	                    // enable drag if necessary
+	                    that.stage.on("mousemove", function(event) {
+	                        peaks.seeking = false;
+
+	                        dX = event.evt.layerX > x ? x - event.evt.layerX : (x - event.evt.layerX) * 1;
+	                        x = event.evt.layerX;
+	                        p = that.frameOffset + dX;
+	                        p = p < 0 ? 0 : p > (that.pixelLength - that.width) ? (that.pixelLength - that.width) : p;
+
+	                        that.updateZoomWaveform(p);
+	                    });
+
+	                    that.stage.on("mouseup", function() {
+	                        if (peaks.seeking) {
+	                            // Set playhead position only on click release, when not dragging
+	                            that.peaks.emit("user_seek.zoomview", that.data.time(that.frameOffset + x), that.frameOffset + x);
+	                        }
+
+	                        that.stage.off("mousemove mouseup");
+	                        peaks.seeking = false;
+	                    });
+	                }
+	            }
+	        });
+
+	        // EVENTS ====================================================
+
+	        var userSeekHandler = function userSeekHandler(options, time) {
+	            options = options || {
+	                withOffset: true
+	            };
+	            var frameIndex = that.data.at_time(time);
+
+	            that.seekFrame(frameIndex, options.withOffset ? Math.round(that.width / 2) : 0);
+
+	            if (that.playing) {
+	                that.playFrom(time, frameIndex);
+	            }
+	        };
+
+	        that.peaks.on("player_time_update", function(time) {
+	            if (!peaks.seeking) {
+	                that.seekFrame(that.data.at_time(time));
+	            }
+	        });
+
+	        that.peaks.on("player_seek", userSeekHandler.bind(null, {
+	            withOffset: true
+	        }));
+	        that.peaks.on("user_seek.*", userSeekHandler.bind(null, {
+	            withOffset: true
+	        }));
+	        that.peaks.on("user_scrub.*", userSeekHandler.bind(null, {
+	            withOffset: false
+	        }));
+
+	        that.peaks.on("player_play", function(time) {
+	            that.playing = true;
+	            that.playFrom(time, that.data.at_time(time));
+	        });
+
+	        that.peaks.on("player_pause", function(time) {
+	            that.playing = false;
+
+	            if (that.playheadLineAnimation) {
+	                that.playheadLineAnimation.stop();
+	            }
+
+	            that.syncPlayhead(that.data.at_time(time));
+	        });
+
+	        that.peaks.on("zoom.update", function(current_scale, previous_scale) {
+	            if (that.playing) {
+	                return;
+	            }
+
+	            if (current_scale !== previous_scale) {
+	                that.data = that.rootData.resample({
+	                    scale: current_scale
+	                });
+
+	                var animation = ZoomAnimation.init(current_scale, previous_scale, that);
+	                animation.start();
+	            }
+	        });
+
+	        that.peaks.on("window_resized", function(width, newWaveformData) {
+	            that.width = width;
+	            that.data = newWaveformData;
+	            that.stage.setWidth(that.width);
+	            that.updateZoomWaveform(that.frameOffset);
+	            that.peaks.emit("zoomview_resized");
+	        });
+
+	        // KEYBOARD EVENTS =========================================
+	        var nudgeFrame = function nudgeFrame(step) {
+	            var time = that.options.mediaElement.currentTime;
+
+	            time += (that.options.nudgeIncrement * step);
+	            that.seekFrame(that.data.at_time(time));
+	        };
+
+	        that.peaks.on("kybrd_left", nudgeFrame.bind(that, -1));
+	        that.peaks.on("kybrd_right", nudgeFrame.bind(that, 1));
+	        that.peaks.on("kybrd_shift_left", nudgeFrame.bind(that, -10));
+	        that.peaks.on("kybrd_shift_right", nudgeFrame.bind(that, 10));
+	    }
+
+	    // WAVEFORM ZOOMVIEW FUNCTIONS =========================================
+
+	    WaveformZoomView.prototype.createZoomWaveform = function() {
+	        var that = this;
+	        that.zoomWaveformShape = new Kinetic.Shape({
+	            fill: that.options.zoomWaveformColor,
+	            strokeWidth: 0
+	        });
+
+	        that.zoomWaveformShape.setDrawFunc(mixins.waveformDrawFunction.bind(that.zoomWaveformShape, that));
+
+	        that.zoomWaveformLayer.add(that.zoomWaveformShape);
+	        that.stage.add(that.zoomWaveformLayer);
+	        that.peaks.emit("waveform_zoom_displaying", 0 * that.data.seconds_per_pixel, that.width * that.data.seconds_per_pixel);
 	    };
 
-	    that.peaks.on("kybrd_left", nudgeFrame.bind(that, -1));
-	    that.peaks.on("kybrd_right", nudgeFrame.bind(that, 1));
-	    that.peaks.on("kybrd_shift_left", nudgeFrame.bind(that, -10));
-	    that.peaks.on("kybrd_shift_right", nudgeFrame.bind(that, 10));
-	  }
+	    WaveformZoomView.prototype.createUi = function() {
+	        var that = this;
 
-	  // WAVEFORM ZOOMVIEW FUNCTIONS =========================================
+	        that.zoomPlayheadLine = new Kinetic.Line({
+	            points: [0.5, 0, 0.5, that.height],
+	            stroke: that.options.playheadColor,
+	            strokeWidth: 1
+	        });
 
-	  WaveformZoomView.prototype.createZoomWaveform = function() {
-	    var that = this;
-	    that.zoomWaveformShape = new Kinetic.Shape({
-	      fill: that.options.zoomWaveformColor,
-	      strokeWidth: 0
-	    });
+	        that.zoomPlayheadText = new Kinetic.Text({
+	            x: 2,
+	            y: 12,
+	            text: "00:00:00",
+	            fontSize: 11,
+	            fontFamily: 'sans-serif',
+	            fill: '#aaa',
+	            align: 'right'
+	        });
 
-	    that.zoomWaveformShape.setDrawFunc(mixins.waveformDrawFunction.bind(that.zoomWaveformShape, that));
+	        that.zoomPlayheadGroup = new Kinetic.Group({
+	            x: 0,
+	            y: 0
+	        }).add(that.zoomPlayheadLine).add(that.zoomPlayheadText);
 
-	    that.zoomWaveformLayer.add(that.zoomWaveformShape);
-	    that.stage.add(that.zoomWaveformLayer);
-	    that.peaks.emit("waveform_zoom_displaying", 0 * that.data.seconds_per_pixel, that.width * that.data.seconds_per_pixel);
-	  };
+	        that.uiLayer.add(that.zoomPlayheadGroup);
+	        that.stage.add(that.uiLayer);
 
-	  WaveformZoomView.prototype.createUi = function() {
-	    var that = this;
+	        that.zoomPlayheadGroup.moveToTop();
+	    };
 
-	    that.zoomPlayheadLine = new Kinetic.Line({
-	      points: [0.5, 0, 0.5, that.height],
-	      stroke: that.options.playheadColor,
-	      strokeWidth: 1
-	    });
+	    WaveformZoomView.prototype.updateZoomWaveform = function(pixelOffset) {
+	        var that = this;
 
-	    that.zoomPlayheadText = new Kinetic.Text({
-	      x:2,
-	      y: 12,
-	      text: "00:00:00",
-	      fontSize: 11,
-	      fontFamily: 'sans-serif',
-	      fill: '#aaa',
-	      align: 'right'
-	    });
+	        that.frameOffset = pixelOffset;
+	        that.pixelLength = that.data.adapter.length;
+	        that.data.offset(pixelOffset, pixelOffset + that.width);
 
-	    that.zoomPlayheadGroup = new Kinetic.Group({
-	      x: 0,
-	      y: 0
-	    }).add(that.zoomPlayheadLine).add(that.zoomPlayheadText);
+	        var display = (that.playheadPixel >= pixelOffset) && (that.playheadPixel <= pixelOffset + that.width); //i.e. playhead is within the zoom frame width
 
-	    that.uiLayer.add(that.zoomPlayheadGroup);
-	    that.stage.add(that.uiLayer);
+	        if (display) {
+	            var remPixels = that.playheadPixel - pixelOffset;
 
-	    that.zoomPlayheadGroup.moveToTop();
-	  };
+	            that.zoomPlayheadGroup.show().setAttr("x", remPixels);
+	            that.zoomPlayheadText.setText(mixins.niceTime(that.data.time(that.playheadPixel), false));
+	        } else {
+	            that.zoomPlayheadGroup.hide();
+	        }
 
-	  WaveformZoomView.prototype.updateZoomWaveform = function (pixelOffset) {
-	    var that = this;
+	        that.uiLayer.draw();
+	        that.zoomWaveformLayer.draw();
 
-	    that.frameOffset = pixelOffset;
-	    that.pixelLength = that.data.adapter.length;
-	    that.data.offset(pixelOffset, pixelOffset + that.width);
+	        // if (that.snipWaveformShape) that.updateSnipWaveform(that.currentSnipStartTime, that.currentSnipEndTime);
 
-	    var display = (that.playheadPixel >= pixelOffset) && (that.playheadPixel <= pixelOffset + that.width); //i.e. playhead is within the zoom frame width
+	        that.peaks.emit("waveform_zoom_displaying", pixelOffset * that.data.seconds_per_pixel, (pixelOffset + that.width) * that.data.seconds_per_pixel);
+	    };
 
-	    if (display) {
-	      var remPixels = that.playheadPixel - pixelOffset;
+	    // UI functions ==============================
 
-	      that.zoomPlayheadGroup.show().setAttr("x", remPixels);
-	      that.zoomPlayheadText.setText(mixins.niceTime(that.data.time(that.playheadPixel), false));
-	    }
-	    else {
-	      that.zoomPlayheadGroup.hide();
-	    }
+	    /**
+	     * Create a playhead animation in sync with the audio playback.
+	     *
+	     * @param {Number} time Position in time where the playhead starts
+	     * @param {Integer} startPosition Position in frame index where the playhead starts
+	     */
+	    WaveformZoomView.prototype.playFrom = function(time, startPosition) {
+	        var that = this;
 
-	    that.uiLayer.draw();
-	    that.zoomWaveformLayer.draw();
+	        if (that.playheadLineAnimation) {
+	            that.playheadLineAnimation.stop();
+	        }
 
-	    // if (that.snipWaveformShape) that.updateSnipWaveform(that.currentSnipStartTime, that.currentSnipEndTime);
+	        var frameSeconds = 0;
+	        var pixelsPerSecond = that.data.pixels_per_second;
 
-	    that.peaks.emit("waveform_zoom_displaying", pixelOffset * that.data.seconds_per_pixel, (pixelOffset+that.width) * that.data.seconds_per_pixel);
-	  };
+	        that.playheadLineAnimation = new Kinetic.Animation(function(frame) {
+	            var time = frame.time;
 
-	  // UI functions ==============================
+	            var seconds = time / 1000;
+	            var positionInFrame = Math.round(startPosition - that.frameOffset + (pixelsPerSecond * (seconds - frameSeconds)));
 
-	  /**
-	   * Create a playhead animation in sync with the audio playback.
-	   *
-	   * @param {Number} time Position in time where the playhead starts
-	   * @param {Integer} startPosition Position in frame index where the playhead starts
-	   */
-	  WaveformZoomView.prototype.playFrom = function (time, startPosition) {
-	    var that = this;
+	            that.syncPlayhead(that.frameOffset + positionInFrame);
+	        }, that.uiLayer);
 
-	    if (that.playheadLineAnimation) {
-	      that.playheadLineAnimation.stop();
-	    }
+	        that.playheadLineAnimation.start();
+	    };
 
-	    var frameSeconds = 0;
-	    var pixelsPerSecond = that.data.pixels_per_second;
+	    WaveformZoomView.prototype.newFrame = function(frameOffset) {
+	        var nextOffset = frameOffset + this.width;
 
-	    that.playheadLineAnimation = new Kinetic.Animation(function (frame) {
-	      var time = frame.time;
+	        if (nextOffset < this.data.adapter.length) {
+	            this.frameOffset = nextOffset;
+	            this.updateZoomWaveform(nextOffset);
 
-	      var seconds = time / 1000;
-	      var positionInFrame = Math.round(startPosition - that.frameOffset + (pixelsPerSecond * (seconds-frameSeconds)));
+	            return true;
+	        }
 
-	      that.syncPlayhead(that.frameOffset + positionInFrame);
-	    }, that.uiLayer);
+	        return false;
+	    };
 
-	    that.playheadLineAnimation.start();
-	  };
+	    WaveformZoomView.prototype.syncPlayhead = function(pixelIndex) {
+	        var that = this;
+	        var display = (pixelIndex >= that.frameOffset) && (pixelIndex <= that.frameOffset + that.width);
 
-	  WaveformZoomView.prototype.newFrame = function (frameOffset) {
-	    var nextOffset = frameOffset + this.width;
+	        that.playheadPixel = pixelIndex;
 
-	    if (nextOffset < this.data.adapter.length){
-	      this.frameOffset = nextOffset;
-	      this.updateZoomWaveform(nextOffset);
+	        if (display) {
+	            var remPixels = that.playheadPixel - that.frameOffset; //places playhead at centre of zoom frame i.e. remPixels = 500
+	            that.zoomPlayheadGroup.show().setAttr("x", remPixels);
+	            that.zoomPlayheadText.setText(mixins.niceTime(that.data.time(that.playheadPixel), false));
+	        } else {
+	            that.zoomPlayheadGroup.hide();
+	        }
 
-	      return true;
-	    }
+	        that.uiLayer.draw();
+	    };
 
-	    return false;
-	  };
+	    WaveformZoomView.prototype.seekFrame = function(pixelIndex, offset) {
+	        var that = this;
+	        var upperLimit = that.data.adapter.length - that.width;
+	        var direction = pixelIndex < that.data.offset_start ? 'backwards' : 'onwards';
 
-	  WaveformZoomView.prototype.syncPlayhead = function (pixelIndex) {
-	    var that = this;
-	    var display = (pixelIndex >= that.frameOffset) && (pixelIndex <= that.frameOffset + that.width);
+	        if (!that.data.in_offset(pixelIndex)) {
+	            that.frameOffset = pixelIndex - Math.round(that.width / 2);
+	            if (that.frameOffset <= 0) {
+	                that.frameOffset = 0;
+	            } else if (that.frameOffset + that.width >= that.data.adapter.length) {
+	                that.frameOffset = upperLimit;
+	            }
+	        }
 
-	    that.playheadPixel = pixelIndex;
+	        that.syncPlayhead(pixelIndex);
+	        that.updateZoomWaveform(that.frameOffset);
+	    };
 
-	    if (display) {
-	      var remPixels = that.playheadPixel - that.frameOffset; //places playhead at centre of zoom frame i.e. remPixels = 500
-	      that.zoomPlayheadGroup.show().setAttr("x", remPixels);
-	      that.zoomPlayheadText.setText(mixins.niceTime(that.data.time(that.playheadPixel), false));
-	    }
-	    else {
-	      that.zoomPlayheadGroup.hide();
-	    }
-
-	    that.uiLayer.draw();
-	  };
-
-	  WaveformZoomView.prototype.seekFrame = function (pixelIndex, offset) {
-	    var that = this;
-	    var upperLimit = that.data.adapter.length - that.width;
-	    var direction = pixelIndex < that.data.offset_start ? 'backwards' : 'onwards';
-
-	    if (!that.data.in_offset(pixelIndex)) {
-	      that.frameOffset = pixelIndex - Math.round(that.width / 2);
-	      if (that.frameOffset <= 0) {
-	        that.frameOffset = 0;
-	      } else if (that.frameOffset + that.width >= that.data.adapter.length) {
-	        that.frameOffset = upperLimit;
-	      }
-	    }
-
-	    that.syncPlayhead(pixelIndex);
-	    that.updateZoomWaveform(that.frameOffset);
-	  };
-
-	  return WaveformZoomView;
+	    return WaveformZoomView;
 	}.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__), __WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
 
 
@@ -2470,265 +2470,267 @@
 	 * removing and manipulation of segments
 	 */
 	!(__WEBPACK_AMD_DEFINE_ARRAY__ = [
-	  __webpack_require__(11),
-	  __webpack_require__(4),
-	  __webpack_require__(13)
-	  ], __WEBPACK_AMD_DEFINE_RESULT__ = function (Kinetic, mixins, SegmentShape) {
-	  'use strict';
+	    __webpack_require__(11),
+	    __webpack_require__(4),
+	    __webpack_require__(14)
+	], __WEBPACK_AMD_DEFINE_RESULT__ = function(Kinetic, mixins, SegmentShape) {
+	    'use strict';
 
-	  return function (peaks) {
-	    var self = this;
+	    return function(peaks) {
+	        var self = this;
 
-	    self.segments = [];
-	    self.views = [peaks.waveform.waveformZoomView, peaks.waveform.waveformOverview].map(function(view){
-	      if (!view.segmentLayer) {
-	        view.segmentLayer = new Kinetic.Layer();
-	        view.stage.add(view.segmentLayer);
-	        view.segmentLayer.moveToTop();
-	      }
+	        self.segments = [];
+	        self.views = [peaks.waveform.waveformZoomView, peaks.waveform.waveformOverview].map(function(view) {
+	            if (!view.segmentLayer) {
+	                view.segmentLayer = new Kinetic.Layer();
+	                view.stage.add(view.segmentLayer);
+	                view.segmentLayer.moveToTop();
+	            }
 
-	      return view;
-	    });
+	            return view;
+	        });
 
-	    var createSegmentWaveform = function (segmentId, startTime, endTime, editable, color, labelText) {
-	      var segment = {
-	        id: segmentId,
-	        startTime: startTime,
-	        endTime: endTime,
-	        labelText: labelText || "",
-	        color: color || getSegmentColor(),
-	        editable: editable
-	      };
+	        var createSegmentWaveform = function(segmentId, startTime, endTime, editable, color, labelText) {
+	            var segment = {
+	                id: segmentId,
+	                startTime: startTime,
+	                endTime: endTime,
+	                labelText: labelText || "",
+	                color: color || getSegmentColor(),
+	                editable: editable
+	            };
 
-	      var segmentZoomGroup = new Kinetic.Group();
-	      var segmentOverviewGroup = new Kinetic.Group();
+	            var segmentZoomGroup = new Kinetic.Group();
+	            var segmentOverviewGroup = new Kinetic.Group();
 
-	      var segmentGroups = [segmentZoomGroup, segmentOverviewGroup];
+	            var segmentGroups = [segmentZoomGroup, segmentOverviewGroup];
 
-	      var menter = function (event) {
-	        this.parent.label.show();
-	        this.parent.view.segmentLayer.draw();
-	      };
+	            var menter = function(event) {
+	                this.parent.label.show();
+	                this.parent.view.segmentLayer.draw();
+	            };
 
-	      var mleave = function (event) {
-	        this.parent.label.hide();
-	        this.parent.view.segmentLayer.draw();
-	      };
+	            var mleave = function(event) {
+	                this.parent.label.hide();
+	                this.parent.view.segmentLayer.draw();
+	            };
 
-	      segmentGroups.forEach(function(segmentGroup, i){
-	        var view = self.views[i];
+	            segmentGroups.forEach(function(segmentGroup, i) {
+	                var view = self.views[i];
 
-	        segmentGroup.waveformShape = SegmentShape.createShape(segment, view);
+	                segmentGroup.waveformShape = SegmentShape.createShape(segment, view);
 
-	        segmentGroup.waveformShape.on("mouseenter", menter);
-	        segmentGroup.waveformShape.on("mouseleave", mleave);
+	                segmentGroup.waveformShape.on("mouseenter", menter);
+	                segmentGroup.waveformShape.on("mouseleave", mleave);
 
-	        segmentGroup.add(segmentGroup.waveformShape);
+	                segmentGroup.add(segmentGroup.waveformShape);
 
-	        segmentGroup.label = new peaks.options.segmentLabelDraw(segmentGroup, segment);
-	        segmentGroup.add(segmentGroup.label.hide());
+	                segmentGroup.label = new peaks.options.segmentLabelDraw(segmentGroup, segment);
+	                segmentGroup.add(segmentGroup.label.hide());
 
-	        if (editable) {
-	          var draggable = true;
+	                if (editable) {
+	                    var draggable = true;
 
-	          segmentGroup.inMarker = new peaks.options.segmentInMarker(draggable, segmentGroup, segment, segmentHandleDrag);
-	          segmentGroup.add(segmentGroup.inMarker);
+	                    segmentGroup.inMarker = new peaks.options.segmentInMarker(draggable, segmentGroup, segment, segmentHandleDrag);
+	                    segmentGroup.add(segmentGroup.inMarker);
 
-	          segmentGroup.outMarker = new peaks.options.segmentOutMarker(draggable, segmentGroup, segment, segmentHandleDrag);
-	          segmentGroup.add(segmentGroup.outMarker);
-	        }
+	                    segmentGroup.outMarker = new peaks.options.segmentOutMarker(draggable, segmentGroup, segment, segmentHandleDrag);
+	                    segmentGroup.add(segmentGroup.outMarker);
+	                }
 
-	        view.segmentLayer.add(segmentGroup);
-	      });
+	                view.segmentLayer.add(segmentGroup);
+	            });
 
-	      segment.zoom = segmentZoomGroup;
-	      segment.zoom.view = peaks.waveform.waveformZoomView;
-	      segment.overview = segmentOverviewGroup;
-	      segment.overview.view = peaks.waveform.waveformOverview;
+	            segment.zoom = segmentZoomGroup;
+	            segment.zoom.view = peaks.waveform.waveformZoomView;
+	            segment.overview = segmentOverviewGroup;
+	            segment.overview.view = peaks.waveform.waveformOverview;
 
-	      return segment;
+	            return segment;
+	        };
+
+	        var updateSegmentWaveform = function(segment) {
+	            // Binding with data
+	            peaks.waveform.waveformOverview.data.set_segment(peaks.waveform.waveformOverview.data.at_time(segment.startTime), peaks.waveform.waveformOverview.data.at_time(segment.endTime), segment.id);
+	            peaks.waveform.waveformZoomView.data.set_segment(peaks.waveform.waveformZoomView.data.at_time(segment.startTime), peaks.waveform.waveformZoomView.data.at_time(segment.endTime), segment.id);
+
+	            // Overview
+	            var overviewStartOffset = peaks.waveform.waveformOverview.data.at_time(segment.startTime);
+	            var overviewEndOffset = peaks.waveform.waveformOverview.data.at_time(segment.endTime);
+
+	            segment.overview.setWidth(overviewEndOffset - overviewStartOffset);
+
+	            if (segment.editable) {
+	                if (segment.overview.inMarker) segment.overview.inMarker.show().setX(overviewStartOffset - segment.overview.inMarker.getWidth());
+	                if (segment.overview.outMarker) segment.overview.outMarker.show().setX(overviewEndOffset);
+
+	                // Change Text
+	                segment.overview.inMarker.label.setText(mixins.niceTime(segment.startTime, false));
+	                segment.overview.outMarker.label.setText(mixins.niceTime(segment.endTime, false));
+	            }
+
+	            // Label
+	            // segment.overview.label.setX(overviewStartOffset);
+
+	            SegmentShape.update.call(segment.overview.waveformShape, peaks.waveform.waveformOverview, segment.id);
+	            segment.overview.view.segmentLayer.draw();
+
+	            // Zoom
+	            var zoomStartOffset = peaks.waveform.waveformZoomView.data.at_time(segment.startTime);
+	            var zoomEndOffset = peaks.waveform.waveformZoomView.data.at_time(segment.endTime);
+
+	            var frameStartOffset = peaks.waveform.waveformZoomView.frameOffset;
+	            var frameEndOffset = peaks.waveform.waveformZoomView.frameOffset + peaks.waveform.waveformZoomView.width;
+
+	            if (zoomStartOffset < frameStartOffset) zoomStartOffset = frameStartOffset;
+	            if (zoomEndOffset > frameEndOffset) zoomEndOffset = frameEndOffset;
+
+	            if (peaks.waveform.waveformZoomView.data.segments[segment.id].visible) {
+	                var startPixel = zoomStartOffset - frameStartOffset;
+	                var endPixel = zoomEndOffset - frameStartOffset;
+
+	                segment.zoom.show();
+
+	                if (segment.editable) {
+	                    if (segment.zoom.inMarker) segment.zoom.inMarker.show().setX(startPixel - segment.zoom.inMarker.getWidth());
+	                    if (segment.zoom.outMarker) segment.zoom.outMarker.show().setX(endPixel);
+
+	                    // Change Text
+	                    segment.zoom.inMarker.label.setText(mixins.niceTime(segment.startTime, false));
+	                    segment.zoom.outMarker.label.setText(mixins.niceTime(segment.endTime, false));
+	                }
+
+	                SegmentShape.update.call(segment.zoom.waveformShape, peaks.waveform.waveformZoomView, segment.id);
+
+	                segment.zoom.view.segmentLayer.draw();
+
+	            } else {
+	                segment.zoom.hide();
+	            }
+	        };
+
+	        var segmentHandleDrag = function(thisSeg, segment) {
+	            if (thisSeg.inMarker.getX() > 0) {
+	                var inOffset = thisSeg.view.frameOffset + thisSeg.inMarker.getX() + thisSeg.inMarker.getWidth();
+	                segment.startTime = thisSeg.view.data.time(inOffset);
+	            }
+
+	            if (thisSeg.outMarker.getX() < thisSeg.view.width) {
+	                var outOffset = thisSeg.view.frameOffset + thisSeg.outMarker.getX();
+	                segment.endTime = thisSeg.view.data.time(outOffset);
+	            }
+
+	            updateSegmentWaveform(segment);
+	        };
+
+	        var getSegmentColor = function() {
+	            var c;
+	            if (peaks.options.randomizeSegmentColor) {
+	                var g = function() {
+	                    return Math.floor(Math.random() * 255);
+	                };
+	                c = 'rgba(' + g() + ', ' + g() + ', ' + g() + ', 1)';
+	            } else {
+	                c = peaks.options.segmentColor;
+	            }
+	            return c;
+	        };
+
+	        this.init = function() {
+	            peaks.on("waveform_zoom_displaying", this.updateSegments.bind(this));
+
+	            peaks.emit("segments.ready");
+	        };
+
+	        /**
+	         * Update the segment positioning accordingly to each view zoom level and so on.
+	         *
+	         * Also performs the rendering.
+	         *
+	         * @api
+	         */
+	        this.updateSegments = function() {
+	            this.segments.forEach(updateSegmentWaveform);
+	            this.render();
+	        };
+
+	        /**
+	         * Manage a new segment and propagates it into the different views
+	         *
+	         * @api
+	         * @param {Number} startTime
+	         * @param {Number} endTime
+	         * @param {Boolean} editable
+	         * @param {String=} color
+	         * @param {String=} labelText
+	         * @return {Object}
+	         */
+	        this.createSegment = function(startTime, endTime, editable, color, labelText) {
+	            var segmentId = "segment" + self.segments.length;
+
+	            if ((startTime >= 0) === false) {
+	                throw new TypeError("[waveform.segments.createSegment] startTime should be a positive value");
+	            }
+
+	            if ((endTime > 0) === false) {
+	                throw new TypeError("[waveform.segments.createSegment] endTime should be a positive value");
+	            }
+
+	            if ((endTime > startTime) === false) {
+	                throw new RangeError("[waveform.segments.createSegment] endTime should be higher than startTime");
+	            }
+
+	            var segment = createSegmentWaveform(segmentId, startTime, endTime, editable, color, labelText);
+
+	            updateSegmentWaveform(segment);
+	            self.segments.push(segment);
+
+	            return segment;
+	        };
+
+	        this.remove = function removeSegment(segment) {
+	            var index = null;
+
+	            this.segments.some(function(s, i) {
+	                if (s === segment) {
+	                    index = i;
+	                    return true;
+	                }
+	            });
+
+	            if (typeof index === 'number') {
+	                segment = this.segments[index];
+
+	                segment.overview.destroy();
+	                segment.zoom.destroy();
+	            }
+
+	            return index;
+	        };
+
+	        this.removeAll = function removeAllSegments() {
+	            this.views.forEach(function(view) {
+	                view.segmentLayer.removeChildren();
+	            });
+
+	            this.segments = [];
+
+	            this.render();
+	        };
+
+	        /**
+	         * Performs the rendering of the segments on screen
+	         *
+	         * @api
+	         * @see https://github.com/bbcrd/peaks.js/pull/5
+	         * @since 0.0.2
+	         */
+	        this.render = function renderSegments() {
+	            this.views.forEach(function(view) {
+	                view.segmentLayer.draw();
+	            });
+	        };
 	    };
-
-	    var updateSegmentWaveform = function (segment) {
-	      // Binding with data
-	      peaks.waveform.waveformOverview.data.set_segment(peaks.waveform.waveformOverview.data.at_time(segment.startTime), peaks.waveform.waveformOverview.data.at_time(segment.endTime), segment.id);
-	      peaks.waveform.waveformZoomView.data.set_segment(peaks.waveform.waveformZoomView.data.at_time(segment.startTime), peaks.waveform.waveformZoomView.data.at_time(segment.endTime), segment.id);
-
-	      // Overview
-	      var overviewStartOffset = peaks.waveform.waveformOverview.data.at_time(segment.startTime);
-	      var overviewEndOffset = peaks.waveform.waveformOverview.data.at_time(segment.endTime);
-
-	      segment.overview.setWidth(overviewEndOffset - overviewStartOffset);
-
-	      if (segment.editable) {
-	        if (segment.overview.inMarker) segment.overview.inMarker.show().setX(overviewStartOffset - segment.overview.inMarker.getWidth());
-	        if (segment.overview.outMarker) segment.overview.outMarker.show().setX(overviewEndOffset);
-
-	        // Change Text
-	        segment.overview.inMarker.label.setText(mixins.niceTime(segment.startTime, false));
-	        segment.overview.outMarker.label.setText(mixins.niceTime(segment.endTime, false));
-	      }
-
-	      // Label
-	      // segment.overview.label.setX(overviewStartOffset);
-
-	      SegmentShape.update.call(segment.overview.waveformShape, peaks.waveform.waveformOverview, segment.id);
-	      segment.overview.view.segmentLayer.draw();
-
-	      // Zoom
-	      var zoomStartOffset = peaks.waveform.waveformZoomView.data.at_time(segment.startTime);
-	      var zoomEndOffset = peaks.waveform.waveformZoomView.data.at_time(segment.endTime);
-
-	      var frameStartOffset = peaks.waveform.waveformZoomView.frameOffset;
-	      var frameEndOffset = peaks.waveform.waveformZoomView.frameOffset + peaks.waveform.waveformZoomView.width;
-
-	      if (zoomStartOffset < frameStartOffset) zoomStartOffset = frameStartOffset;
-	      if (zoomEndOffset > frameEndOffset) zoomEndOffset = frameEndOffset;
-
-	      if (peaks.waveform.waveformZoomView.data.segments[segment.id].visible) {
-	        var startPixel = zoomStartOffset - frameStartOffset;
-	        var endPixel = zoomEndOffset - frameStartOffset;
-
-	        segment.zoom.show();
-
-	        if (segment.editable) {
-	          if (segment.zoom.inMarker) segment.zoom.inMarker.show().setX(startPixel - segment.zoom.inMarker.getWidth());
-	          if (segment.zoom.outMarker) segment.zoom.outMarker.show().setX(endPixel);
-
-	          // Change Text
-	          segment.zoom.inMarker.label.setText(mixins.niceTime(segment.startTime, false));
-	          segment.zoom.outMarker.label.setText(mixins.niceTime(segment.endTime, false));
-	        }
-
-	        SegmentShape.update.call(segment.zoom.waveformShape, peaks.waveform.waveformZoomView, segment.id);
-
-	        segment.zoom.view.segmentLayer.draw();
-
-	      } else {
-	        segment.zoom.hide();
-	      }
-	    };
-
-	    var segmentHandleDrag = function (thisSeg, segment) {
-	      if (thisSeg.inMarker.getX() > 0) {
-	        var inOffset = thisSeg.view.frameOffset + thisSeg.inMarker.getX() + thisSeg.inMarker.getWidth();
-	        segment.startTime = thisSeg.view.data.time(inOffset);
-	      }
-
-	      if (thisSeg.outMarker.getX() < thisSeg.view.width) {
-	        var outOffset = thisSeg.view.frameOffset + thisSeg.outMarker.getX();
-	        segment.endTime = thisSeg.view.data.time(outOffset);
-	      }
-
-	      updateSegmentWaveform(segment);
-	    };
-
-	    var getSegmentColor = function () {
-	      var c;
-	      if (peaks.options.randomizeSegmentColor) {
-	        var g = function () { return Math.floor(Math.random()*255); };
-	        c = 'rgba('+g()+', '+g()+', '+g()+', 1)';
-	      } else {
-	        c = peaks.options.segmentColor;
-	      }
-	      return c;
-	    };
-
-	    this.init = function () {
-	      peaks.on("waveform_zoom_displaying", this.updateSegments.bind(this));
-
-	      peaks.emit("segments.ready");
-	    };
-
-	    /**
-	     * Update the segment positioning accordingly to each view zoom level and so on.
-	     *
-	     * Also performs the rendering.
-	     *
-	     * @api
-	     */
-	    this.updateSegments = function () {
-	      this.segments.forEach(updateSegmentWaveform);
-	      this.render();
-	    };
-
-	    /**
-	     * Manage a new segment and propagates it into the different views
-	     *
-	     * @api
-	     * @param {Number} startTime
-	     * @param {Number} endTime
-	     * @param {Boolean} editable
-	     * @param {String=} color
-	     * @param {String=} labelText
-	     * @return {Object}
-	     */
-	    this.createSegment = function (startTime, endTime, editable, color, labelText) {
-	      var segmentId = "segment" + self.segments.length;
-
-	      if ((startTime >= 0) === false){
-	        throw new TypeError("[waveform.segments.createSegment] startTime should be a positive value");
-	      }
-
-	      if ((endTime > 0) === false){
-	        throw new TypeError("[waveform.segments.createSegment] endTime should be a positive value");
-	      }
-
-	      if ((endTime > startTime) === false){
-	        throw new RangeError("[waveform.segments.createSegment] endTime should be higher than startTime");
-	      }
-
-	      var segment = createSegmentWaveform(segmentId, startTime, endTime, editable, color, labelText);
-
-	      updateSegmentWaveform(segment);
-	      self.segments.push(segment);
-
-	      return segment;
-	    };
-
-	    this.remove = function removeSegment(segment){
-	      var index = null;
-
-	      this.segments.some(function(s, i){
-	        if (s === segment){
-	          index = i;
-	          return true;
-	        }
-	      });
-
-	      if (typeof index === 'number'){
-	        segment = this.segments[index];
-
-	        segment.overview.destroy();
-	        segment.zoom.destroy();
-	      }
-
-	      return index;
-	    };
-
-	    this.removeAll = function removeAllSegments(){
-	      this.views.forEach(function(view){
-	        view.segmentLayer.removeChildren();
-	      });
-
-	      this.segments = [];
-
-	      this.render();
-	    };
-
-	    /**
-	     * Performs the rendering of the segments on screen
-	     *
-	     * @api
-	     * @see https://github.com/bbcrd/peaks.js/pull/5
-	     * @since 0.0.2
-	     */
-	    this.render = function renderSegments(){
-	      this.views.forEach(function(view){
-	        view.segmentLayer.draw();
-	      });
-	    };
-	  };
 	}.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__), __WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
 
 
@@ -2743,166 +2745,166 @@
 	 * removing and manipulation of points. A point in a segment of zero length
 	 */
 	!(__WEBPACK_AMD_DEFINE_ARRAY__ = [
-	  __webpack_require__(4),
-	  __webpack_require__(11)
-	], __WEBPACK_AMD_DEFINE_RESULT__ = function (mixins, Kinetic) {
+	    __webpack_require__(4),
+	    __webpack_require__(11)
+	], __WEBPACK_AMD_DEFINE_RESULT__ = function(mixins, Kinetic) {
 
-	  return function (peaks) {
-	    var self = this;
-	    var waveformView = peaks.waveform;
+	    return function(peaks) {
+	        var self = this;
+	        var waveformView = peaks.waveform;
 
-	    self.points = [];
+	        self.points = [];
 
-	    self.views = [waveformView.waveformZoomView, waveformView.waveformOverview].map(function(view){
-	      if (!view.pointLayer) {
-	        view.pointLayer = new Kinetic.Layer();
-	        view.stage.add(view.pointLayer);
-	        view.pointLayer.moveToTop();
-	      }
+	        self.views = [waveformView.waveformZoomView, waveformView.waveformOverview].map(function(view) {
+	            if (!view.pointLayer) {
+	                view.pointLayer = new Kinetic.Layer();
+	                view.stage.add(view.pointLayer);
+	                view.pointLayer.moveToTop();
+	            }
 
-	      return view;
-	    });
+	            return view;
+	        });
 
-	    function constructPoint(point) {
-	      var pointZoomGroup = new Kinetic.Group();
-	      var pointOverviewGroup = new Kinetic.Group();
-	      var pointGroups = [pointZoomGroup, pointOverviewGroup];
+	        function constructPoint(point) {
+	            var pointZoomGroup = new Kinetic.Group();
+	            var pointOverviewGroup = new Kinetic.Group();
+	            var pointGroups = [pointZoomGroup, pointOverviewGroup];
 
-	      point.editable = Boolean(point.editable);
+	            point.editable = Boolean(point.editable);
 
-	      pointGroups.forEach(function(pointGroup, i){
-	        var view = self.views[i];
+	            pointGroups.forEach(function(pointGroup, i) {
+	                var view = self.views[i];
 
-	        if (point.editable) {
-	          pointGroup.marker = new peaks.options.pointMarker(true, pointGroup, point, pointHandleDrag, peaks.options.pointDblClickHandler, peaks.options.pointDragEndHandler);
-	          pointGroup.add(pointGroup.marker);
+	                if (point.editable) {
+	                    pointGroup.marker = new peaks.options.pointMarker(true, pointGroup, point, pointHandleDrag, peaks.options.pointDblClickHandler, peaks.options.pointDragEndHandler);
+	                    pointGroup.add(pointGroup.marker);
+	                }
+
+	                view.pointLayer.add(pointGroup);
+	            });
+
+	            point.zoom = pointZoomGroup;
+	            point.zoom.view = waveformView.waveformZoomView;
+	            point.overview = pointOverviewGroup;
+	            point.overview.view = waveformView.waveformOverview;
+
+	            return point;
 	        }
 
-	        view.pointLayer.add(pointGroup);
-	      });
+	        function updatePoint(point) {
+	            // Binding with data
+	            waveformView.waveformOverview.data.set_point(waveformView.waveformOverview.data.at_time(point.timestamp), point.id);
+	            waveformView.waveformZoomView.data.set_point(waveformView.waveformZoomView.data.at_time(point.timestamp), point.id);
 
-	      point.zoom = pointZoomGroup;
-	      point.zoom.view = waveformView.waveformZoomView;
-	      point.overview = pointOverviewGroup;
-	      point.overview.view = waveformView.waveformOverview;
+	            // Overview
+	            var overviewtimestampOffset = waveformView.waveformOverview.data.at_time(point.timestamp);
 
-	      return point;
-	    }
+	            if (point.editable) {
+	                if (point.overview.marker) point.overview.marker.show().setX(overviewtimestampOffset - point.overview.marker.getWidth());
 
-	    function updatePoint(point) {
-	      // Binding with data
-	      waveformView.waveformOverview.data.set_point(waveformView.waveformOverview.data.at_time(point.timestamp), point.id);
-	      waveformView.waveformZoomView.data.set_point(waveformView.waveformZoomView.data.at_time(point.timestamp), point.id);
+	                // Change Text
+	                point.overview.marker.label.setText(mixins.niceTime(point.timestamp, false));
+	            }
 
-	      // Overview
-	      var overviewtimestampOffset = waveformView.waveformOverview.data.at_time(point.timestamp);
+	            // Zoom
+	            var zoomtimestampOffset = waveformView.waveformZoomView.data.at_time(point.timestamp);
+	            var frameStartOffset = waveformView.waveformZoomView.frameOffset;
 
-	      if (point.editable) {
-	        if (point.overview.marker) point.overview.marker.show().setX(overviewtimestampOffset - point.overview.marker.getWidth());
+	            if (zoomtimestampOffset < frameStartOffset) {
+	                zoomStartOffset = frameStartOffset;
+	            }
 
-	        // Change Text
-	        point.overview.marker.label.setText(mixins.niceTime(point.timestamp, false));
-	      }
+	            if (waveformView.waveformZoomView.data.points[point.id].visible) {
+	                var startPixel = zoomtimestampOffset - frameStartOffset;
 
-	      // Zoom
-	      var zoomtimestampOffset = waveformView.waveformZoomView.data.at_time(point.timestamp);
-	      var frameStartOffset = waveformView.waveformZoomView.frameOffset;
+	                point.zoom.show();
 
-	      if (zoomtimestampOffset < frameStartOffset) {
-	        zoomStartOffset = frameStartOffset;
-	      }
+	                if (point.editable) {
+	                    if (point.zoom.marker) point.zoom.marker.show().setX(startPixel - point.zoom.marker.getWidth());
 
-	      if (waveformView.waveformZoomView.data.points[point.id].visible) {
-	        var startPixel = zoomtimestampOffset - frameStartOffset;
-
-	        point.zoom.show();
-
-	        if (point.editable) {
-	          if (point.zoom.marker) point.zoom.marker.show().setX(startPixel - point.zoom.marker.getWidth());
-
-	          // Change Text
-	          point.zoom.marker.label.setText(mixins.niceTime(point.timestamp, false));
+	                    // Change Text
+	                    point.zoom.marker.label.setText(mixins.niceTime(point.timestamp, false));
+	                }
+	            } else {
+	                point.zoom.hide();
+	            }
 	        }
-	      }
-	      else {
-	        point.zoom.hide();
-	      }
-	    }
 
-	    function pointHandleDrag(thisPoint, point) {
-	      if (thisPoint.marker.getX() > 0) {
-	        var inOffset = thisPoint.view.frameOffset + thisPoint.marker.getX() + thisPoint.marker.getWidth();
-	        point.timestamp = thisPoint.view.data.time(inOffset);
-	      }
+	        function pointHandleDrag(thisPoint, point) {
+	            if (thisPoint.marker.getX() > 0) {
+	                var inOffset = thisPoint.view.frameOffset + thisPoint.marker.getX() + thisPoint.marker.getWidth();
+	                point.timestamp = thisPoint.view.data.time(inOffset);
+	            }
 
-	      updatePoint(point);
-	      self.render();
-	    }
-
-	    this.init = function () {
-	      peaks.on("waveform_zoom_displaying", self.updatePoints.bind(self));
-	      peaks.emit("points.ready");
-	    };
-
-	    this.updatePoints = function () {
-	      self.points.forEach(updatePoint);
-	      self.render();
-	    };
-
-	    this.createPoint = function (point) {
-
-	      if ((point.timestamp >= 0) === false) {
-	        throw new RangeError("[waveform.points.createPoint] timestamp should be a >=0 value");
-	      }
-
-	      point.id = "point" + self.points.length;
-
-	      point = constructPoint(point);
-	      updatePoint(point);
-	      self.points.push(point);
-	    };
-
-	    this.remove = function removePoint(point) {
-	      var index = null;
-
-	      this.points.some(function(p, i){
-	        if (p === point){
-	          index = i;
-	          return true;
+	            updatePoint(point);
+	            self.render();
 	        }
-	      });
 
-	      if (typeof index === 'number'){
-	        point.overview.destroy();
-	        point.zoom.destroy();
-	      }
+	        this.init = function() {
+	            peaks.on("waveform_zoom_displaying", self.updatePoints.bind(self));
+	            peaks.emit("points.ready");
+	        };
 
-	      return index;
+	        this.updatePoints = function() {
+	            self.points.forEach(updatePoint);
+	            self.render();
+	        };
+
+	        this.createPoint = function(point) {
+
+	            if ((point.timestamp >= 0) === false) {
+	                throw new RangeError("[waveform.points.createPoint] timestamp should be a >=0 value");
+	            }
+
+	            point.id = "point" + self.points.length;
+
+	            point = constructPoint(point);
+	            updatePoint(point);
+	            self.points.push(point);
+	        };
+
+	        this.remove = function removePoint(point) {
+	            var index = null;
+
+	            this.points.some(function(p, i) {
+	                if (p === point) {
+	                    index = i;
+	                    return true;
+	                }
+	            });
+
+	            if (typeof index === 'number') {
+	                point.overview.destroy();
+	                point.zoom.destroy();
+	            }
+
+	            return index;
+	        };
+
+	        this.removeAll = function removeAllPoints() {
+	            this.views.forEach(function(view) {
+	                view.pointLayer.removeChildren();
+	            });
+
+	            this.points = [];
+
+	            this.render();
+	        };
+
+	        /**
+	         * Performs the rendering of the segments on screen
+	         *
+	         * @api
+	         * @since 0.3.0
+	         */
+	        this.render = function renderPoints() {
+	            self.views.forEach(function(view) {
+	                view.pointLayer.draw();
+	            });
+	        };
 	    };
-
-	    this.removeAll = function removeAllPoints(){
-	      this.views.forEach(function(view){
-	        view.pointLayer.removeChildren();
-	      });
-
-	      this.points = [];
-
-	      this.render();
-	    };
-
-	    /**
-	     * Performs the rendering of the segments on screen
-	     *
-	     * @api
-	     * @since 0.3.0
-	     */
-	    this.render = function renderPoints(){
-	      self.views.forEach(function(view){
-	        view.pointLayer.draw();
-	      });
-	    };
-	  };
 	}.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__), __WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
+
 
 /***/ },
 /* 10 */
@@ -2925,13 +2927,13 @@
 
 	/* WEBPACK VAR INJECTION */(function(global) {
 	/*
-	 * KineticJS JavaScript Framework v5.2.0
-	 * http://lavrton.github.io/KineticJS/
+	 * KineticJS JavaScript Framework v5.1.1
+	 * http://www.kineticjs.com/
+	 * Copyright 2013, Eric Rowell
 	 * Licensed under the MIT or GPL Version 2 licenses.
-	 * Date: 2015-01-22
+	 * Date: 2014-10-03
 	 *
-	 * Original work Copyright (C) 2011 - 2013 by Eric Rowell
-	 * Modified work Copyright (C) 2014 - 2015 by Anton Lavrenov
+	 * Copyright (C) 2011 - 2013 by Eric Rowell
 	 *
 	 * Permission is hereby granted, free of charge, to any person obtaining a copy
 	 * of this software and associated documentation files (the "Software"), to deal
@@ -2961,7 +2963,7 @@
 
 	    Kinetic = {
 	        // public
-	        version: '5.2.0',
+	        version: '5.1.1',
 
 	        // private
 	        stages: [],
@@ -3435,15 +3437,13 @@
 	        },
 	        _addName: function(node, name) {
 	            if(name !== undefined) {
-
-	                var names = name.split(/\s/g);
+	                var names = name.split(/\W+/g);
 	                for(var n = 0; n < names.length; n++) {
-	                    var subname = names[n];
-	                    if (subname) {
-	                        if(this.names[subname] === undefined) {
-	                            this.names[subname] = [];
+	                    if (names[n]) {
+	                        if(this.names[names[n]] === undefined) {
+	                            this.names[names[n]] = [];
 	                        }
-	                        this.names[subname].push(node);
+	                        this.names[names[n]].push(node);
 	                    }
 	                }
 	            }
@@ -4189,19 +4189,12 @@
 	                console.warn(KINETIC_WARNING + str);
 	            }
 	        },
-	        extend: function(child, parent) {
-	                function ctor() {
-	                    this.constructor = child;
+	        extend: function(c1, c2) {
+	            for(var key in c2.prototype) {
+	                if(!( key in c1.prototype)) {
+	                    c1.prototype[key] = c2.prototype[key];
 	                }
-	                ctor.prototype = parent.prototype;
-	                var old_proto = child.prototype;
-	                child.prototype = new ctor();
-	                for (var key in old_proto) {
-	                    if (old_proto.hasOwnProperty(key)) {
-	                        child.prototype[key] = old_proto[key];
-	                    }
-	                }
-	                child.__super__ = parent.prototype;
+	            }
 	        },
 	        /**
 	         * adds methods to a constructor prototype
@@ -5538,6 +5531,17 @@
 	                    name: name,
 	                    handler: handler
 	                });
+
+	                // NOTE: this flag is set to true when any event handler is added, even non
+	                // mouse or touch gesture events.  This improves performance for most
+	                // cases where users aren't using events, but is still very light weight.  
+	                // To ensure perfect accuracy, devs can explicitly set listening to false.
+	                /*
+	                if (name !== KINETIC) {
+	                    this._listeningEnabled = true;
+	                    this._clearSelfAndAncestorCache(LISTENING_ENABLED);
+	                }
+	                */
 	            }
 
 	            return this;
@@ -5718,7 +5722,7 @@
 
 	            if(config) {
 	                for(key in config) {
-	                    if (key === CHILDREN || config[key] instanceof Kinetic.Node) {
+	                    if (key === CHILDREN) {
 
 	                    }
 	                    else {
@@ -5826,7 +5830,7 @@
 	        shouldDrawHit: function(canvas) {
 	            var layer = this.getLayer();
 	            return  (canvas && canvas.isCache) || (layer && layer.hitGraphEnabled())
-	                && this.isListening() && this.isVisible();
+	                && this.isListening() && this.isVisible() && !Kinetic.isDragging();
 	        },
 	        /**
 	         * show node
@@ -7024,7 +7028,6 @@
 	    /**
 	     * get/set offset x
 	     * @name offsetX
-	     * @method
 	     * @memberof Kinetic.Node.prototype
 	     * @param {Number} x
 	     * @returns {Number}
@@ -7037,6 +7040,26 @@
 	     */
 
 	    Kinetic.Factory.addGetterSetter(Kinetic.Node, 'offsetY', 0);
+
+	    /**
+	     * get/set drag distance
+	     * @name dragDistance
+	     * @memberof Kinetic.Node.prototype
+	     * @param {Number} distance
+	     * @returns {Number}
+	     * @example
+	     * // get drag distance
+	     * var dragDistance = node.dragDistance();
+	     *
+	     * // set distance
+	     * // node starts dragging only if pointer moved more then 3 pixels
+	     * node.dragDistance(3);
+	     * // or set globally
+	     * Kinetic.dragDistance = 3;
+	     */
+
+	    Kinetic.Factory.addSetter(Kinetic.Node, 'dragDistance');
+	    Kinetic.Factory.addOverloadedGetterSetter(Kinetic.Node, 'dragDistance');
 
 	    /**
 	     * get/set offset y
@@ -7052,28 +7075,6 @@
 	     * // set offset y
 	     * node.offsetY(3);
 	     */
-
-	    Kinetic.Factory.addSetter(Kinetic.Node, 'dragDistance');
-	    Kinetic.Factory.addOverloadedGetterSetter(Kinetic.Node, 'dragDistance');
-
-	    /**
-	     * get/set drag distance
-	     * @name dragDistance
-	     * @method
-	     * @memberof Kinetic.Node.prototype
-	     * @param {Number} distance
-	     * @returns {Number}
-	     * @example
-	     * // get drag distance
-	     * var dragDistance = node.dragDistance();
-	     *
-	     * // set distance
-	     * // node starts dragging only if pointer moved more then 3 pixels
-	     * node.dragDistance(3);
-	     * // or set globally
-	     * Kinetic.dragDistance = 3;
-	     */
-
 
 	    Kinetic.Factory.addSetter(Kinetic.Node, 'width', 0);
 	    Kinetic.Factory.addOverloadedGetterSetter(Kinetic.Node, 'width');
@@ -10186,7 +10187,7 @@
 	     * var dragBoundFunc = node.dragBoundFunc();
 	     *
 	     * // create vertical drag and drop
-	     * node.dragBoundFunc(function(pos){
+	     * node.dragBoundFunc(function(){
 	     *   return {
 	     *     x: this.getAbsolutePosition().x,
 	     *     y: pos.y
@@ -10335,11 +10336,6 @@
 	            this._fire('add', {
 	                child: child
 	            });
-
-	            // if node under drag we need to update drag animation
-	            if (child.isDragging()) {
-	                Kinetic.DD.anim.setLayers(child.getLayer());
-	            }
 
 	            // chainable
 	            return this;
@@ -10579,10 +10575,8 @@
 	        },
 	        shouldDrawHit: function(canvas) {
 	            var layer = this.getLayer();
-	            var dd = Kinetic.DD;
-	            var layerUnderDrag = dd && Kinetic.isDragging() && (Kinetic.DD.anim.getLayers().indexOf(layer) !== -1);
 	            return  (canvas && canvas.isCache) || (layer && layer.hitGraphEnabled())
-	                && this.isVisible() && !layerUnderDrag;
+	                && this.isVisible() && !Kinetic.isDragging();
 	        }
 	    });
 
@@ -11414,9 +11408,6 @@
 	     *
 	     * // set fill color with rgba and make it 50% opaque
 	     * shape.fill('rgba(0,255,0,0.5');
-	     *
-	     * // shape without fill
-	     * shape.fill(null);
 	     */
 
 	    Kinetic.Factory.addGetterSetter(Kinetic.Shape, 'fillRed', 0, Kinetic.Validators.RGBComponent);
@@ -12892,12 +12883,7 @@
 	         * @param {Number} [bounds.height]
 	         * @example
 	         * layer.clear();
-	         * layer.clear({
-	         *   x : 0,
-	         *   y : 0,
-	         *   width : 100,
-	         *   height : 100
-	         * });
+	         * layer.clear(0, 0, 100, 100);
 	         */
 	        clear: function(bounds) {
 	            this.getContext().clear(bounds);
@@ -13233,12 +13219,7 @@
 	         * @param {Number} [bounds.height]
 	         * @example
 	         * layer.clear();
-	         * layer.clear({
-	         *   x : 0,
-	         *   y : 0,
-	         *   width : 100,
-	         *   height : 100
-	         * });
+	         * layer.clear(0, 0, 100, 100);
 	         */
 	        clear: function(bounds) {
 	            this.getContext().clear(bounds);
@@ -13370,12 +13351,7 @@
 	         * @param {Number} [bounds.height]
 	         * @example
 	         * layer.clear();
-	         * layer.clear({
-	         *   x : 0,
-	         *   y : 0,
-	         *   width : 100,
-	         *   height : 100
-	         * });
+	         * layer.clear(0, 0, 100, 100);
 	         */
 	        clear: function(bounds) {
 	            this.getContext().clear(bounds);
@@ -14864,8 +14840,7 @@
 
 	    Kinetic.Text.prototype = {
 	        ___init: function(config) {
-	            config = config || {};
-	            config.fill = config.fill || 'black';
+	            var that = this;
 
 	            if (config.width === undefined) {
 	                config.width = AUTO;
@@ -14883,7 +14858,7 @@
 
 	            // update text data for certain attr changes
 	            for(var n = 0; n < attrChangeListLen; n++) {
-	                this.on(ATTR_CHANGE_LIST[n] + CHANGE_KINETIC, this._setTextData);
+	                this.on(ATTR_CHANGE_LIST[n] + CHANGE_KINETIC, that._setTextData);
 	            }
 
 	            this._setTextData();
@@ -15397,10 +15372,6 @@
 	                closed = this.getClosed(),
 	                tp, len, n;
 
-	            if (!length) {
-	                return;
-	            }
-
 	            context.beginPath();
 	            context.moveTo(points[0], points[1]);
 
@@ -15536,7 +15507,7 @@
 	     * line.tension(3);
 	     */
 
-	    Kinetic.Factory.addGetterSetter(Kinetic.Line, 'points', []);
+	    Kinetic.Factory.addGetterSetter(Kinetic.Line, 'points');
 	    /**
 	     * get/set points array
 	     * @name points
@@ -15723,7 +15694,6 @@
 	                index = this.frameIndex(),
 	                ix4 = index * 4,
 	                set = this.getAnimations()[anim],
-	                offsets = this.frameOffsets(),
 	                x =      set[ix4 + 0],
 	                y =      set[ix4 + 1],
 	                width =  set[ix4 + 2],
@@ -15731,13 +15701,7 @@
 	                image = this.getImage();
 
 	            if(image) {
-	                if (offsets) {
-	                    var offset = offsets[anim],
-	                    ix2 = index * 2;
-	                    context.drawImage(image, x, y, width, height, offset[ix2 + 0], offset[ix2 + 1], width, height);
-	                } else {
-	                    context.drawImage(image, x, y, width, height, 0, 0, width, height);
-	                }
+	                context.drawImage(image, x, y, width, height, 0, 0, width, height);
 	            }
 	        },
 	        _hitFunc: function(context) {
@@ -15745,18 +15709,11 @@
 	                index = this.frameIndex(),
 	                ix4 = index * 4,
 	                set = this.getAnimations()[anim],
-	                offsets = this.frameOffsets(),
 	                width =  set[ix4 + 2],
 	                height = set[ix4 + 3];
 
 	            context.beginPath();
-	            if (offsets) {
-	                var offset = offsets[anim];
-	                var ix2 = index * 2;
-	                context.rect(offset[ix2 + 0], offset[ix2 + 1], width, height);
-	            } else {
-	                context.rect(0, 0, width, height);
-	            }
+	            context.rect(0, 0, width, height);
 	            context.closePath();
 	            context.fillShape(this);
 	        },
@@ -15876,42 +15833,6 @@
 	     * });
 	     */
 
-	    Kinetic.Factory.addGetterSetter(Kinetic.Sprite, 'frameOffsets');
-
-	    /**
-	    * get/set offsets map
-	    * @name offsets
-	    * @method
-	    * @memberof Kinetic.Sprite.prototype
-	    * @param {Object} offsets
-	    * @returns {Object}
-	    * @example
-	    * // get offsets map
-	    * var offsets = sprite.offsets();
-	    *
-	    * // set offsets map
-	    * sprite.offsets({
-	    *   standing: [
-	    *     // x, y (6 frames)
-	    *     0, 0,
-	    *     0, 0,
-	    *     5, 0,
-	    *     0, 0,
-	    *     0, 3,
-	    *     2, 0
-	    *   ],
-	    *   kicking: [
-	    *     // x, y (6 frames)
-	    *     0, 5,
-	    *     5, 0,
-	    *     10, 0,
-	    *     0, 0,
-	    *     2, 1,
-	    *     0, 0
-	    *   ]
-	    * });
-	    */
-	 
 	    Kinetic.Factory.addGetterSetter(Kinetic.Sprite, 'image');
 
 	    /**
@@ -18076,138 +17997,136 @@
 	 * instantiated meaning this code is reused multiple times.
 	 *
 	 */
-	!(__WEBPACK_AMD_DEFINE_ARRAY__ = [__webpack_require__(4), __webpack_require__(11)], __WEBPACK_AMD_DEFINE_RESULT__ = function (mixins, Kinetic) {
-	  'use strict';
+	!(__WEBPACK_AMD_DEFINE_ARRAY__ = [__webpack_require__(4), __webpack_require__(11)], __WEBPACK_AMD_DEFINE_RESULT__ = function(mixins, Kinetic) {
+	    'use strict';
 
-	  /*
-	   * Rounds the given value up to the nearest given multiple.
-	   * e.g: roundUpToNearest(5.5, 3) returns 6
-	   *      roundUpToNearest(141.0, 10) returns 150
-	   *      roundUpToNearest(-5.5, 3) returns -6
-	   */
+	    /*
+	     * Rounds the given value up to the nearest given multiple.
+	     * e.g: roundUpToNearest(5.5, 3) returns 6
+	     *      roundUpToNearest(141.0, 10) returns 150
+	     *      roundUpToNearest(-5.5, 3) returns -6
+	     */
 
-	  function roundUpToNearest(value, multiple) {
-	    var remainder = value % multiple;
-	    if (remainder === 0) {
-	      return value;
-	    }
-	    else {
-	      return value + multiple - remainder;
-	    }
-	  }
-
-	  function WaveformAxis(view) {
-	    this.view = view; // store reference to waveform view object
-
-	    this.axisShape = new Kinetic.Shape({
-	      fill: 'rgba(38, 255, 161, 1)',
-	      strokeWidth: 0,
-	      opacity: 1
-	    });
-
-	    this.axisShape.setDrawFunc(this.axisDrawFunction.bind(this, view));
-
-	    this.view.uiLayer.add(this.axisShape);
-	  }
-
-	  /*
-	   * Returns number of seconds for each x-axis marker, appropriate for the
-	   * current zoom level, ensuring that markers are not too close together
-	   * and that markers are placed at intuitive time intervals (i.e., every 1,
-	   * 2, 5, 10, 20, 30 seconds, then every 1, 2, 5, 10, 20, 30 minutes, then
-	   * every 1, 2, 5, 10, 20, 30 hours).
-	   */
-
-	  WaveformAxis.prototype.getAxisLabelScale = function() {
-	    var baseSecs   = 1; // seconds
-	    var steps      = [1, 2, 5, 10, 20, 30];
-	    var minSpacing = 60;
-	    var index      = 0;
-
-	    var secs;
-
-	    for (;;) {
-	      secs = baseSecs * steps[index];
-	      var pixels = this.view.data.at_time(secs);
-	      if (pixels < minSpacing) {
-	        if (++index == steps.length) {
-	          baseSecs *= 60; // seconds -> minutes -> hours
-	          index = 0;
+	    function roundUpToNearest(value, multiple) {
+	        var remainder = value % multiple;
+	        if (remainder === 0) {
+	            return value;
+	        } else {
+	            return value + multiple - remainder;
 	        }
-	      }
-	      else {
-	        break;
-	      }
 	    }
-	    return secs;
-	  };
 
+	    function WaveformAxis(view) {
+	        this.view = view; // store reference to waveform view object
 
-	  /**
-	   *
-	   * @param {WaveformOverview|WaveformZoomview} view
-	   * @param {Kinetic.Context} context
-	   */
-	  WaveformAxis.prototype.axisDrawFunction = function (view, context) {
-	    var currentFrameStartTime = view.data.time(view.frameOffset);
+	        this.axisShape = new Kinetic.Shape({
+	            fill: 'rgba(38, 255, 161, 1)',
+	            strokeWidth: 0,
+	            opacity: 1
+	        });
 
-	    // Draw axis markers
-	    var markerHeight = 10;
+	        this.axisShape.setDrawFunc(this.axisDrawFunction.bind(this, view));
 
-	    // Time interval between axis markers (seconds)
-	    var axisLabelIntervalSecs = this.getAxisLabelScale();
-
-	    // Time of first axis marker (seconds)
-	    var firstAxisLabelSecs = roundUpToNearest(currentFrameStartTime, axisLabelIntervalSecs);
-
-	    // Distance between waveform start time and first axis marker (seconds)
-	    var axisLabelOffsetSecs = firstAxisLabelSecs - currentFrameStartTime;
-
-	    // Distance between waveform start time and first axis marker (pixels)
-	    var axisLabelOffsetPixels = this.view.data.at_time(axisLabelOffsetSecs);
-
-	    context.strokeStyle = "#ccc";
-	    context.lineWidth = 1;
-
-	    // Set text style
-	    context.font = "11px sans-serif";
-	    context.fillStyle = "#aaa";
-	    context.textAlign = "left";
-	    context.textBaseline = "bottom";
-
-	    var secs = firstAxisLabelSecs;
-	    var x;
-
-	    for (;;) {
-	      // Position of axis marker (pixels)
-	      x = axisLabelOffsetPixels + this.view.data.at_time(secs - firstAxisLabelSecs);
-	      if (x >= this.view.width) {
-	        break;
-	      }
-
-	      // Draw the axis out old-skool canvas style
-
-	      context.beginPath();
-	      context.moveTo(x + 0.5, 0);
-	      context.lineTo(x + 0.5, 0 + markerHeight);
-	      context.moveTo(x + 0.5, this.view.height);
-	      context.lineTo(x + 0.5, this.view.height - markerHeight);
-	      context.stroke();
-
-	      var label      = mixins.niceTime(secs, true);
-	      var labelWidth = context._context.measureText(label).width; // todo handle this with Kinetic.Text
-	      var labelX     = x - labelWidth / 2;
-	      var labelY     = this.view.height - 1 - markerHeight;
-
-	      if (labelX >= 0) {
-	        context.fillText(label, labelX, labelY);
-	      }
-
-	      secs += axisLabelIntervalSecs;
+	        this.view.uiLayer.add(this.axisShape);
 	    }
-	  };
 
-	  return WaveformAxis;
+	    /*
+	     * Returns number of seconds for each x-axis marker, appropriate for the
+	     * current zoom level, ensuring that markers are not too close together
+	     * and that markers are placed at intuitive time intervals (i.e., every 1,
+	     * 2, 5, 10, 20, 30 seconds, then every 1, 2, 5, 10, 20, 30 minutes, then
+	     * every 1, 2, 5, 10, 20, 30 hours).
+	     */
+
+	    WaveformAxis.prototype.getAxisLabelScale = function() {
+	        var baseSecs = 1; // seconds
+	        var steps = [1, 2, 5, 10, 20, 30];
+	        var minSpacing = 60;
+	        var index = 0;
+
+	        var secs;
+
+	        for (;;) {
+	            secs = baseSecs * steps[index];
+	            var pixels = this.view.data.at_time(secs);
+	            if (pixels < minSpacing) {
+	                if (++index == steps.length) {
+	                    baseSecs *= 60; // seconds -> minutes -> hours
+	                    index = 0;
+	                }
+	            } else {
+	                break;
+	            }
+	        }
+	        return secs;
+	    };
+
+
+	    /**
+	     *
+	     * @param {WaveformOverview|WaveformZoomview} view
+	     * @param {Kinetic.Context} context
+	     */
+	    WaveformAxis.prototype.axisDrawFunction = function(view, context) {
+	        var currentFrameStartTime = view.data.time(view.frameOffset);
+
+	        // Draw axis markers
+	        var markerHeight = 10;
+
+	        // Time interval between axis markers (seconds)
+	        var axisLabelIntervalSecs = this.getAxisLabelScale();
+
+	        // Time of first axis marker (seconds)
+	        var firstAxisLabelSecs = roundUpToNearest(currentFrameStartTime, axisLabelIntervalSecs);
+
+	        // Distance between waveform start time and first axis marker (seconds)
+	        var axisLabelOffsetSecs = firstAxisLabelSecs - currentFrameStartTime;
+
+	        // Distance between waveform start time and first axis marker (pixels)
+	        var axisLabelOffsetPixels = this.view.data.at_time(axisLabelOffsetSecs);
+
+	        context.strokeStyle = "#ccc";
+	        context.lineWidth = 1;
+
+	        // Set text style
+	        context.font = "11px sans-serif";
+	        context.fillStyle = "#aaa";
+	        context.textAlign = "left";
+	        context.textBaseline = "bottom";
+
+	        var secs = firstAxisLabelSecs;
+	        var x;
+
+	        for (;;) {
+	            // Position of axis marker (pixels)
+	            x = axisLabelOffsetPixels + this.view.data.at_time(secs - firstAxisLabelSecs);
+	            if (x >= this.view.width) {
+	                break;
+	            }
+
+	            // Draw the axis out old-skool canvas style
+
+	            context.beginPath();
+	            context.moveTo(x + 0.5, 0);
+	            context.lineTo(x + 0.5, 0 + markerHeight);
+	            context.moveTo(x + 0.5, this.view.height);
+	            context.lineTo(x + 0.5, this.view.height - markerHeight);
+	            context.stroke();
+
+	            var label = mixins.niceTime(secs, true);
+	            var labelWidth = context._context.measureText(label).width; // todo handle this with Kinetic.Text
+	            var labelX = x - labelWidth / 2;
+	            var labelY = this.view.height - 1 - markerHeight;
+
+	            if (labelX >= 0) {
+	                context.fillText(label, labelX, labelY);
+	            }
+
+	            secs += axisLabelIntervalSecs;
+	        }
+	    };
+
+	    return WaveformAxis;
 	}.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__), __WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
 
 
@@ -18221,57 +18140,98 @@
 	 * This module handles all functionality related to the adding,
 	 * removing and manipulation of segments
 	 */
-	!(__WEBPACK_AMD_DEFINE_ARRAY__ = [
-	  __webpack_require__(20),
-	  __webpack_require__(4),
-	  __webpack_require__(11)
-	], __WEBPACK_AMD_DEFINE_RESULT__ = function (BaseShape, mixins, Kinetic) {
-	  'use strict';
+	!(__WEBPACK_AMD_DEFINE_ARRAY__ = [__webpack_require__(11)], __WEBPACK_AMD_DEFINE_RESULT__ = function(Kinetic) {
+	    'use strict';
 
-	  var WaveShape = Object.create(BaseShape.prototype);
+	    return {
+	        init: function(currentSampleRate, previousSampleRate, view) {
+	            var that = view;
+	            var currentTime = that.peaks.time.getCurrentTime();
+	            var frameData = [];
 
-	  /**
-	   *
-	   * @param segmentData
-	   * @param view
-	   * @returns {Kinetic.Shape}
-	   */
-	  WaveShape.createShape = function createShape(segmentData, view){
-	    var shape = new Kinetic.Shape({
-	      fill: segmentData.color,
-	      strokeWidth: 0,
-	      opacity: 1
-	    });
+	            var numOfFrames = 30;
+	            var input_index;
+	            var output_index;
+	            var lastFrameOffsetTime;
 
-	    shape.setDrawFunc(WaveShape.drawFunc.bind(shape, view, segmentData.id));
+	            //Fade out the time axis and the segments
+	            //that.axis.axisShape.setAttr('opacity', 0);
+	            //Fade out segments
+	            if (that.segmentLayer) {
+	                that.segmentLayer.setVisible(false);
+	                that.pointLayer.setVisible(false);
+	            }
 
-	    return shape;
-	  };
+	            // Determine whether zooming in or out
+	            if (previousSampleRate < currentSampleRate) {
+	                numOfFrames = 15;
+	            }
 
-	  /**
-	   *
-	   * @this  {Kinetic.Shape}
-	   * @param {WaveformData} waveform
-	   * @param {Kinetic.Context} context
-	   * @param {interpolateHeight} y
-	   */
-	  WaveShape.drawFunc = function WaveShapedrawFunc(view, segmentId, context){
-	    var waveformData = view.data;
+	            // Create array with resampled data for each animation frame (need to know duration, resample points per frame)
+	            for (var i = 0; i < numOfFrames; i++) {
+	                // Work out interpolated resample scale using currentSampleRate and previousSampleRate
+	                var frame_sample_rate = Math.round(previousSampleRate + ((i + 1) * (currentSampleRate - previousSampleRate) / numOfFrames));
+	                //Determine the timeframe for the zoom animation (start and end of dataset for zooming animation)
 
-	    if (waveformData.segments[segmentId] === undefined){
-	      return;
-	    }
+	                var newWidthSeconds = that.width * frame_sample_rate / that.rootData.adapter.sample_rate;
 
-	    var segment = waveformData.segments[segmentId];
-	    var offset_length = segment.offset_length;
-	    var offset_start = segment.offset_start - waveformData.offset_start;
-	    var y = mixins.interpolateHeight(view.height);
+	                if ((currentTime >= 0) && (currentTime <= 0 + newWidthSeconds / 2)) {
+	                    input_index = 0;
+	                    output_index = 0;
+	                } else if ((currentTime <= that.rootData.duration) && (currentTime >= that.rootData.duration - newWidthSeconds / 2)) {
+	                    lastFrameOffsetTime = that.rootData.duration - newWidthSeconds;
 
-	    mixins.drawWaveform(context, segment.min, segment.max, offset_start, offset_length, y);
-	    context.fillStrokeShape(this);
-	  };
+	                    input_index = (lastFrameOffsetTime * that.rootData.adapter.sample_rate) / previousSampleRate;
+	                    output_index = (lastFrameOffsetTime * that.rootData.adapter.sample_rate) / frame_sample_rate; //sample rate = 44100
+	                } else {
+	                    //This way calculates the index of the start time at the scale we are coming from and the scale we are going to
+	                    var oldPixelIndex = (currentTime * that.rootData.adapter.sample_rate) / previousSampleRate;
+	                    input_index = oldPixelIndex - (that.width / 2);
 
-	  return WaveShape;
+	                    var newPixelIndex = (currentTime * that.rootData.adapter.sample_rate) / frame_sample_rate; //sample rate = 44100
+	                    output_index = newPixelIndex - (that.width / 2);
+	                }
+
+	                if (input_index < 0) {
+	                    input_index = 0;
+	                }
+
+	                var resampled = that.rootData.resample({ // rootData should be swapped for your resampled dataset
+	                    scale: frame_sample_rate,
+	                    input_index: Math.floor(input_index),
+	                    output_index: Math.floor(output_index),
+	                    width: that.width
+	                });
+
+	                frameData.push(resampled);
+
+	                previousSampleRate = frame_sample_rate;
+	            }
+
+	            return new Kinetic.Animation(this.onFrameData(view, frameData), view);
+	        },
+	        onFrameData: function(view, frameData) {
+	            var that = view;
+	            that.intermediateData = null;
+
+	            /**
+	             * @param {Object} frame
+	             * @this {Kinetic.Animation}
+	             */
+	            return function(frame) {
+	                if (frameData.length) {
+	                    //Send correct resampled waveform data object to drawFunc and draw it
+	                    that.intermediateData = frameData.shift();
+	                    that.zoomWaveformLayer.draw();
+	                } else {
+	                    this.stop();
+	                    that.segmentLayer.setVisible(true);
+	                    that.pointLayer.setVisible(true);
+	                    that.seekFrame(that.data.at_time(that.currentTime));
+	                }
+	            };
+	        }
+	    };
 	}.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__), __WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
 
 
@@ -18285,101 +18245,57 @@
 	 * This module handles all functionality related to the adding,
 	 * removing and manipulation of segments
 	 */
-	!(__WEBPACK_AMD_DEFINE_ARRAY__ = [__webpack_require__(11)], __WEBPACK_AMD_DEFINE_RESULT__ = function (Kinetic) {
-	  'use strict';
+	!(__WEBPACK_AMD_DEFINE_ARRAY__ = [
+	    __webpack_require__(20),
+	    __webpack_require__(4),
+	    __webpack_require__(11)
+	], __WEBPACK_AMD_DEFINE_RESULT__ = function(BaseShape, mixins, Kinetic) {
+	    'use strict';
 
-	  return {
-	    init: function (currentSampleRate, previousSampleRate, view) {
-	      var that = view;
-	      var currentTime = that.peaks.time.getCurrentTime();
-	      var frameData = [];
+	    var WaveShape = Object.create(BaseShape.prototype);
 
-	      var numOfFrames = 30;
-	      var input_index;
-	      var output_index;
-	      var lastFrameOffsetTime;
-
-	      //Fade out the time axis and the segments
-	      //that.axis.axisShape.setAttr('opacity', 0);
-	      //Fade out segments
-	      if (that.segmentLayer) {
-	        that.segmentLayer.setVisible(false);
-	        that.pointLayer.setVisible(false);
-	      }
-
-	      // Determine whether zooming in or out
-	      if (previousSampleRate < currentSampleRate) {
-	        numOfFrames = 15;
-	      }
-
-	      // Create array with resampled data for each animation frame (need to know duration, resample points per frame)
-	      for (var i = 0; i < numOfFrames; i++) {
-	        // Work out interpolated resample scale using currentSampleRate and previousSampleRate
-	        var frame_sample_rate = Math.round(previousSampleRate + ((i + 1) * (currentSampleRate - previousSampleRate) / numOfFrames));
-	        //Determine the timeframe for the zoom animation (start and end of dataset for zooming animation)
-
-	        var newWidthSeconds = that.width * frame_sample_rate / that.rootData.adapter.sample_rate;
-
-	        if ((currentTime >= 0) && (currentTime <= 0 + newWidthSeconds/2)){
-	          input_index = 0;
-	          output_index = 0;
-	        }
-	        else if ((currentTime <= that.rootData.duration) && (currentTime >= that.rootData.duration - newWidthSeconds/2)) {
-	          lastFrameOffsetTime = that.rootData.duration - newWidthSeconds;
-
-	          input_index = (lastFrameOffsetTime * that.rootData.adapter.sample_rate) / previousSampleRate;
-	          output_index = (lastFrameOffsetTime * that.rootData.adapter.sample_rate) / frame_sample_rate; //sample rate = 44100
-	        }
-	        else {
-	          //This way calculates the index of the start time at the scale we are coming from and the scale we are going to
-	          var oldPixelIndex = (currentTime * that.rootData.adapter.sample_rate) / previousSampleRate;
-	          input_index = oldPixelIndex - (that.width/2);
-
-	          var newPixelIndex = (currentTime * that.rootData.adapter.sample_rate) / frame_sample_rate; //sample rate = 44100
-	          output_index = newPixelIndex - (that.width/2);
-	        }
-
-	        if (input_index < 0) {
-	          input_index = 0;
-	        }
-
-	        var resampled = that.rootData.resample({ // rootData should be swapped for your resampled dataset
-	          scale:        frame_sample_rate,
-	          input_index:  Math.floor(input_index),
-	          output_index: Math.floor(output_index),
-	          width:        that.width
+	    /**
+	     *
+	     * @param segmentData
+	     * @param view
+	     * @returns {Kinetic.Shape}
+	     */
+	    WaveShape.createShape = function createShape(segmentData, view) {
+	        var shape = new Kinetic.Shape({
+	            fill: segmentData.color,
+	            strokeWidth: 0,
+	            opacity: 1
 	        });
 
-	        frameData.push(resampled);
+	        shape.setDrawFunc(WaveShape.drawFunc.bind(shape, view, segmentData.id));
 
-	        previousSampleRate = frame_sample_rate;
-	      }
+	        return shape;
+	    };
 
-	      return new Kinetic.Animation(this.onFrameData(view, frameData), view);
-	    },
-	    onFrameData: function(view, frameData){
-	      var that = view;
-	      that.intermediateData = null;
+	    /**
+	     *
+	     * @this  {Kinetic.Shape}
+	     * @param {WaveformData} waveform
+	     * @param {Kinetic.Context} context
+	     * @param {interpolateHeight} y
+	     */
+	    WaveShape.drawFunc = function WaveShapedrawFunc(view, segmentId, context) {
+	        var waveformData = view.data;
 
-	      /**
-	       * @param {Object} frame
-	       * @this {Kinetic.Animation}
-	       */
-	      return function(frame){
-	        if (frameData.length) {
-	          //Send correct resampled waveform data object to drawFunc and draw it
-	          that.intermediateData = frameData.shift();
-	          that.zoomWaveformLayer.draw();
+	        if (waveformData.segments[segmentId] === undefined) {
+	            return;
 	        }
-	        else {
-	          this.stop();
-	          that.segmentLayer.setVisible(true);
-	          that.pointLayer.setVisible(true);
-	          that.seekFrame(that.data.at_time(that.currentTime));
-	        }
-	      };
-	    }
-	  };
+
+	        var segment = waveformData.segments[segmentId];
+	        var offset_length = segment.offset_length;
+	        var offset_start = segment.offset_start - waveformData.offset_start;
+	        var y = mixins.interpolateHeight(view.height);
+
+	        mixins.drawWaveform(context, segment.min, segment.max, offset_start, offset_length, y);
+	        context.fillStrokeShape(this);
+	    };
+
+	    return WaveShape;
 	}.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__), __WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
 
 
@@ -18401,8 +18317,8 @@
 
 	"use strict";
 
-	var WaveformDataSegment = __webpack_require__(24);
-	var WaveformDataPoint = __webpack_require__(25);
+	var WaveformDataSegment = __webpack_require__(21);
+	var WaveformDataPoint = __webpack_require__(22);
 
 	/**
 	 * Facade to iterate on audio waveform response.
@@ -18504,8 +18420,6 @@
 	    xhrData = ("responseType" in data) ? data.response : (data.responseText || data.response);
 	  }
 
-	  console.log("adapters: ", Object.keys(WaveformData.adapters));
-	  console.log(xhrData || data);
 	  Object.keys(WaveformData.adapters).some(function(adapter_id){
 	    if (WaveformData.adapters[adapter_id].isCompatible(xhrData || data)){
 	      adapter = WaveformData.adapters[adapter_id];
@@ -19139,8 +19053,8 @@
 	"use strict";
 
 	module.exports = {
-	  "arraybuffer": __webpack_require__(21),
-	  "object": __webpack_require__(22)
+	  "arraybuffer": __webpack_require__(24),
+	  "object": __webpack_require__(25)
 	};
 
 /***/ },
@@ -19153,380 +19067,28 @@
 	 * This module handles all functionality related to the adding,
 	 * removing and manipulation of segments
 	 */
-	!(__WEBPACK_AMD_DEFINE_RESULT__ = function () {
-	  'use strict';
+	!(__WEBPACK_AMD_DEFINE_RESULT__ = function() {
+	    'use strict';
 
-	  function BaseShape(){}
+	    function BaseShape() {}
 
-	  function noop(){}
+	    function noop() {}
 
-	  function throwUndefined(){
-	    throw new Error('You should extend this method in your parent class.');
-	  }
+	    function throwUndefined() {
+	        throw new Error('You should extend this method in your parent class.');
+	    }
 
-	  BaseShape.prototype = {
-	    createShape: throwUndefined,
-	    update: noop
-	  };
+	    BaseShape.prototype = {
+	        createShape: throwUndefined,
+	        update: noop
+	    };
 
-	  return BaseShape;
+	    return BaseShape;
 	}.call(exports, __webpack_require__, exports, module), __WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
 
 
 /***/ },
 /* 21 */
-/***/ function(module, exports, __webpack_require__) {
-
-	"use strict";
-
-	/**
-	 * ArrayBuffer adapter consumes binary waveform data (data format version 1).
-	 * It is used as a data abstraction layer by `WaveformData`.
-	 *
-	 * This is supposed to be the fastest adapter ever:
-	 * * **Pros**: working directly in memory, everything is done by reference (including the offsetting)
-	 * * **Cons**: binary data are hardly readable without data format knowledge (and this is why this adapter exists).
-	 *
-	 * Also, it is recommended to use the `fromResponseData` factory.
-	 *
-	 * @see WaveformDataArrayBufferAdapter.fromResponseData
-	 * @param {DataView} response_data
-	 * @constructor
-	 */
-	var WaveformDataArrayBufferAdapter = module.exports = function WaveformDataArrayBufferAdapter(response_data){
-	  this.data = response_data;
-	};
-
-	/**
-	 * Detects if a set of data is suitable for the ArrayBuffer adapter.
-	 * It is used internally by `WaveformData.create` so you should not bother using it.
-	 *
-	 * @static
-	 * @param {Mixed} data
-	 * @returns {boolean}
-	 */
-	WaveformDataArrayBufferAdapter.isCompatible = function isCompatible(data){
-	  return data && typeof data === "object" && "byteLength" in data;
-	};
-
-	/**
-	 * Setup factory to create an adapter based on heterogeneous input formats.
-	 *
-	 * It is the preferred way to build an adapter instance.
-	 *
-	 * ```javascript
-	 * var arrayBufferAdapter = WaveformData.adapters.arraybuffer;
-	 * var xhr = new XMLHttpRequest();
-	 *
-	 * // .dat file generated by audiowaveform program
-	 * xhr.open("GET", "http://example.com/waveforms/track.dat");
-	 * xhr.responseType = "arraybuffer";
-	 * xhr.addEventListener("load", function onResponse(progressEvent){
-	 *  var responseData = progressEvent.target.response;
-	 *
-	 *  // doing stuff with the raw data ...
-	 *  // you only have access to WaveformDataArrayBufferAdapter API
-	 *  var adapter = arrayBufferAdapter.fromResponseData(responseData);
-	 *
-	 *  // or making things easy by using WaveformData ...
-	 *  // you have access WaveformData API
-	 *  var waveform = new WaveformData(responseData, arrayBufferAdapter);
-	 * });
-	 *
-	 * xhr.send();
-	 * ```
-
-	 * @static
-	 * @param {ArrayBuffer} response_data
-	 * @return {WaveformDataArrayBufferAdapter}
-	 */
-	WaveformDataArrayBufferAdapter.fromResponseData = function fromArrayBufferResponseData(response_data){
-	  return new WaveformDataArrayBufferAdapter(new DataView(response_data));
-	};
-
-	/**
-	 * @namespace WaveformDataArrayBufferAdapter
-	 */
-	WaveformDataArrayBufferAdapter.prototype = {
-	  /**
-	   * Returns the data format version number.
-	   *
-	   * @return {Integer} Version number of the consumed data format.
-	   */
-	  get version(){
-	    return this.data.getInt32(0, true);
-	  },
-	  /**
-	   * Indicates if the response body is encoded in 8bits.
-	   *
-	   * **Notice**: currently the adapter only deals with 8bits encoded data.
-	   * You should favor that too because of the smaller data network fingerprint.
-	   *
-	   * @return {boolean} True if data are declared to be 8bits encoded.
-	   */
-	  get is_8_bit(){
-	    return !!this.data.getUint32(4, true);
-	  },
-	  /**
-	   * Indicates if the response body is encoded in 16bits.
-	   *
-	   * @return {boolean} True if data are declared to be 16bits encoded.
-	   */
-	  get is_16_bit(){
-	    return !this.is_8_bit;
-	  },
-	  /**
-	   * Returns the number of samples per second.
-	   *
-	   * @return {Integer} Number of samples per second.
-	   */
-	  get sample_rate(){
-	    return this.data.getInt32(8, true);
-	  },
-	  /**
-	   * Returns the scale (number of samples per pixel).
-	   *
-	   * @return {Integer} Number of samples per pixel.
-	   */
-	  get scale(){
-	    return this.data.getInt32(12, true);
-	  },
-	  /**
-	   * Returns the length of the waveform data (number of data points).
-	   *
-	   * @return {Integer} Length of the waveform data.
-	   */
-	  get length(){
-	    return this.data.getUint32(16, true);
-	  },
-	  /**
-	   * Returns a value at a specific offset.
-	   *
-	   * @param {Integer} index
-	   * @return {number} waveform value
-	   */
-	  at: function at_sample(index){
-	    return Math.round(this.data.getInt8(20 + index));
-	  }
-	};
-
-
-/***/ },
-/* 22 */
-/***/ function(module, exports, __webpack_require__) {
-
-	"use strict";
-
-	/**
-	 * Object adapter consumes stringified JSON or JSON waveform data (data format version 1).
-	 * It is used as a data abstraction layer by `WaveformData`.
-	 *
-	 * This is supposed to be a fallback for browsers not supporting ArrayBuffer:
-	 * * **Pros**: easy to debug response_data and quite self describing.
-	 * * **Cons**: slower than ArrayBuffer, more memory consumption.
-	 *
-	 * Also, it is recommended to use the `fromResponseData` factory.
-	 *
-	 * @see WaveformDataObjectAdapter.fromResponseData
-	 * @param {String|Object} response_data JSON or stringified JSON
-	 * @constructor
-	 */
-	var WaveformDataObjectAdapter = module.exports = function WaveformDataObjectAdapter(response_data){
-	  this.data = response_data;
-	};
-
-	/**
-	 * Detects if a set of data is suitable for the Object adapter.
-	 * It is used internally by `WaveformData.create` so you should not bother using it.
-	 *
-	 * @static
-	 * @param {Mixed} data
-	 * @returns {boolean}
-	 */
-	WaveformDataObjectAdapter.isCompatible = function isCompatible(data){
-	  return data && (typeof data === "object" && "sample_rate" in data) || (typeof data === "string" && "sample_rate" in JSON.parse(data));
-	};
-
-	/**
-	 * Setup factory to create an adapter based on heterogeneous input formats.
-	 *
-	 * It is the preferred way to build an adapter instance.
-	 *
-	 * ```javascript
-	 * var objectAdapter = WaveformData.adapters.object;
-	 * var xhr = new XMLHttpRequest();
-	 *
-	 * // .dat file generated by audiowaveform program
-	 * xhr.open("GET", "http://example.com/waveforms/track.json");
-	 * xhr.responseType = "json";
-	 * xhr.addEventListener("load", function onResponse(progressEvent){
-	 *  var responseData = progressEvent.target.response;
-	 *
-	 *  // doing stuff with the raw data ...
-	 *  // you only have access to WaveformDataObjectAdapter API
-	 *  var adapter = objectAdapter.fromResponseData(responseData);
-	 *
-	 *  // or making things easy by using WaveformData ...
-	 *  // you have access WaveformData API
-	 *  var waveform = new WaveformData(responseData, objectAdapter);
-	 * });
-	 *
-	 * xhr.send();
-	 * ```
-
-	 * @static
-	 * @param {String|Object} response_data JSON or stringified JSON
-	 * @return {WaveformDataObjectAdapter}
-	 */
-	WaveformDataObjectAdapter.fromResponseData = function fromJSONResponseData(response_data){
-	  if (typeof response_data === "string"){
-	    return new WaveformDataObjectAdapter(JSON.parse(response_data));
-	  }
-	  else{
-	    return new WaveformDataObjectAdapter(response_data);
-	  }
-	};
-	/**
-	 * @namespace WaveformDataObjectAdapter
-	 */
-	WaveformDataObjectAdapter.prototype = {
-	  /**
-	   * Returns the data format version number.
-	   *
-	   * @return {Integer} Version number of the consumed data format.
-	   */
-	  get version(){
-	    return this.data.version || 1;
-	  },
-	  /**
-	   * Indicates if the response body is encoded in 8bits.
-	   *
-	   * **Notice**: currently the adapter only deals with 8bits encoded data.
-	   * You should favor that too because of the smaller data network fingerprint.
-	   *
-	   * @return {boolean} True if data are declared to be 8bits encoded.
-	   */
-	  get is_8_bit(){
-	    return this.data.bits === 8;
-	  },
-	  /**
-	   * Indicates if the response body is encoded in 16bits.
-	   *
-	   * @return {boolean} True if data are declared to be 16bits encoded.
-	   */
-	  get is_16_bit(){
-	    return !this.is_8_bit;
-	  },
-	  /**
-	   * Returns the number of samples per second.
-	   *
-	   * @return {Integer} Number of samples per second.
-	   */
-	  get sample_rate(){
-	    return this.data.sample_rate;
-	  },
-	  /**
-	   * Returns the scale (number of samples per pixel).
-	   *
-	   * @return {Integer} Number of samples per pixel.
-	   */
-	  get scale(){
-	    return this.data.samples_per_pixel;
-	  },
-	  /**
-	   * Returns the length of the waveform data (number of data points).
-	   *
-	   * @return {Integer} Length of the waveform data.
-	   */
-	  get length(){
-	    return this.data.length;
-	  },
-	  /**
-	   * Returns a value at a specific offset.
-	   *
-	   * @param {Integer} index
-	   * @return {number} waveform value
-	   */
-	  at: function at_sample(index){
-	    return Math.round(this.data.data[index]);
-	  }
-	};
-
-
-/***/ },
-/* 23 */
-/***/ function(module, exports, __webpack_require__) {
-
-	'use strict';
-
-	var WaveformData = __webpack_require__(17);
-	/**
-	 * This callback is executed once the audio has been decoded by the browser and resampled by waveform-data.
-	 *
-	 * @callback onAudioResampled
-	 * @param {WaveformData} waveform_data Waveform instance of the browser decoded audio
-	 * @param {AudioBuffer} audio_buffer Decoded audio buffer
-	 */
-	 
-	/**
-	 * AudioBuffer-based WaveformData generator
-	 *
-	 * @param {Object.<{scale: Number, scale_adjuster: Number}>} options
-	 * @param {onAudioResampled} callback
-	 * @returns {Function.<AudioBuffer>}
-	 */
-	module.exports = function getAudioDecoder(options, callback){
-	  var scale = options.scale;
-	  var scale_adjuster = options.scale_adjuster;
-
-	  return function onAudioDecoded(audio_buffer){
-	    var data_length = Math.floor(audio_buffer.length / scale);
-	    var offset = 20;
-	    var data_object = new DataView(new ArrayBuffer(offset + data_length * 2));
-	    var left_channel, right_channel;
-	    var min_value = Infinity, max_value = -Infinity, scale_counter = scale;
-	    var buffer_length = audio_buffer.length;
-
-	    data_object.setInt32(0, 1, true);   //version
-	    data_object.setUint32(4, 1, true);   //is 8 bit
-	    data_object.setInt32(8, audio_buffer.sampleRate, true);   //sample rate
-	    data_object.setInt32(12, scale, true);   //scale
-	    data_object.setInt32(16, data_length, true);   //length
-
-	    left_channel = audio_buffer.getChannelData(0);
-	    right_channel = audio_buffer.getChannelData(0);
-
-	    for (var i = 0; i < buffer_length; i++){
-	      var sample = (left_channel[i] + right_channel[i]) / 2 * scale_adjuster;
-
-	      if (sample < min_value){
-	        min_value = sample;
-	        if (min_value < -128) {
-	          min_value = -128;
-	        }
-	      }
-
-	      if (sample > max_value){
-	        max_value = sample;
-	        if (max_value > 127) {
-	          max_value = 127;
-	        }
-	      }
-
-	      if (--scale_counter === 0){
-	        data_object.setInt8(offset++, Math.floor(min_value));
-	        data_object.setInt8(offset++, Math.floor(max_value));
-	        min_value = Infinity; max_value = -Infinity; scale_counter = scale;
-	      }
-	    }
-
-	    callback(new WaveformData(data_object.buffer, WaveformData.adapters.arraybuffer), audio_buffer);
-	  };
-	};
-
-
-/***/ },
-/* 24 */
 /***/ function(module, exports, __webpack_require__) {
 
 	"use strict";
@@ -19764,7 +19326,7 @@
 	};
 
 /***/ },
-/* 25 */
+/* 22 */
 /***/ function(module, exports, __webpack_require__) {
 
 	"use strict";
@@ -19834,6 +19396,358 @@
 	    return this.context.in_offset(this.timeStamp);
 	  }
 	};
+
+/***/ },
+/* 23 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	var WaveformData = __webpack_require__(17);
+	/**
+	 * This callback is executed once the audio has been decoded by the browser and resampled by waveform-data.
+	 *
+	 * @callback onAudioResampled
+	 * @param {WaveformData} waveform_data Waveform instance of the browser decoded audio
+	 * @param {AudioBuffer} audio_buffer Decoded audio buffer
+	 */
+	 
+	/**
+	 * AudioBuffer-based WaveformData generator
+	 *
+	 * @param {Object.<{scale: Number, scale_adjuster: Number}>} options
+	 * @param {onAudioResampled} callback
+	 * @returns {Function.<AudioBuffer>}
+	 */
+	module.exports = function getAudioDecoder(options, callback){
+	  var scale = options.scale;
+	  var scale_adjuster = options.scale_adjuster;
+
+	  return function onAudioDecoded(audio_buffer){
+	    var data_length = Math.floor(audio_buffer.length / scale);
+	    var offset = 20;
+	    var data_object = new DataView(new ArrayBuffer(offset + data_length * 2));
+	    var left_channel, right_channel;
+	    var min_value = Infinity, max_value = -Infinity, scale_counter = scale;
+	    var buffer_length = audio_buffer.length;
+
+	    data_object.setInt32(0, 1, true);   //version
+	    data_object.setUint32(4, 1, true);   //is 8 bit
+	    data_object.setInt32(8, audio_buffer.sampleRate, true);   //sample rate
+	    data_object.setInt32(12, scale, true);   //scale
+	    data_object.setInt32(16, data_length, true);   //length
+
+	    left_channel = audio_buffer.getChannelData(0);
+	    right_channel = audio_buffer.getChannelData(0);
+
+	    for (var i = 0; i < buffer_length; i++){
+	      var sample = (left_channel[i] + right_channel[i]) / 2 * scale_adjuster;
+
+	      if (sample < min_value){
+	        min_value = sample;
+	        if (min_value < -128) {
+	          min_value = -128;
+	        }
+	      }
+
+	      if (sample > max_value){
+	        max_value = sample;
+	        if (max_value > 127) {
+	          max_value = 127;
+	        }
+	      }
+
+	      if (--scale_counter === 0){
+	        data_object.setInt8(offset++, Math.floor(min_value));
+	        data_object.setInt8(offset++, Math.floor(max_value));
+	        min_value = Infinity; max_value = -Infinity; scale_counter = scale;
+	      }
+	    }
+
+	    callback(new WaveformData(data_object.buffer, WaveformData.adapters.arraybuffer), audio_buffer);
+	  };
+	};
+
+
+/***/ },
+/* 24 */
+/***/ function(module, exports, __webpack_require__) {
+
+	"use strict";
+
+	/**
+	 * ArrayBuffer adapter consumes binary waveform data (data format version 1).
+	 * It is used as a data abstraction layer by `WaveformData`.
+	 *
+	 * This is supposed to be the fastest adapter ever:
+	 * * **Pros**: working directly in memory, everything is done by reference (including the offsetting)
+	 * * **Cons**: binary data are hardly readable without data format knowledge (and this is why this adapter exists).
+	 *
+	 * Also, it is recommended to use the `fromResponseData` factory.
+	 *
+	 * @see WaveformDataArrayBufferAdapter.fromResponseData
+	 * @param {DataView} response_data
+	 * @constructor
+	 */
+	var WaveformDataArrayBufferAdapter = module.exports = function WaveformDataArrayBufferAdapter(response_data){
+	  this.data = response_data;
+	};
+
+	/**
+	 * Detects if a set of data is suitable for the ArrayBuffer adapter.
+	 * It is used internally by `WaveformData.create` so you should not bother using it.
+	 *
+	 * @static
+	 * @param {Mixed} data
+	 * @returns {boolean}
+	 */
+	WaveformDataArrayBufferAdapter.isCompatible = function isCompatible(data){
+	  return data && typeof data === "object" && "byteLength" in data;
+	};
+
+	/**
+	 * Setup factory to create an adapter based on heterogeneous input formats.
+	 *
+	 * It is the preferred way to build an adapter instance.
+	 *
+	 * ```javascript
+	 * var arrayBufferAdapter = WaveformData.adapters.arraybuffer;
+	 * var xhr = new XMLHttpRequest();
+	 *
+	 * // .dat file generated by audiowaveform program
+	 * xhr.open("GET", "http://example.com/waveforms/track.dat");
+	 * xhr.responseType = "arraybuffer";
+	 * xhr.addEventListener("load", function onResponse(progressEvent){
+	 *  var responseData = progressEvent.target.response;
+	 *
+	 *  // doing stuff with the raw data ...
+	 *  // you only have access to WaveformDataArrayBufferAdapter API
+	 *  var adapter = arrayBufferAdapter.fromResponseData(responseData);
+	 *
+	 *  // or making things easy by using WaveformData ...
+	 *  // you have access WaveformData API
+	 *  var waveform = new WaveformData(responseData, arrayBufferAdapter);
+	 * });
+	 *
+	 * xhr.send();
+	 * ```
+
+	 * @static
+	 * @param {ArrayBuffer} response_data
+	 * @return {WaveformDataArrayBufferAdapter}
+	 */
+	WaveformDataArrayBufferAdapter.fromResponseData = function fromArrayBufferResponseData(response_data){
+	  return new WaveformDataArrayBufferAdapter(new DataView(response_data));
+	};
+
+	/**
+	 * @namespace WaveformDataArrayBufferAdapter
+	 */
+	WaveformDataArrayBufferAdapter.prototype = {
+	  /**
+	   * Returns the data format version number.
+	   *
+	   * @return {Integer} Version number of the consumed data format.
+	   */
+	  get version(){
+	    return this.data.getInt32(0, true);
+	  },
+	  /**
+	   * Indicates if the response body is encoded in 8bits.
+	   *
+	   * **Notice**: currently the adapter only deals with 8bits encoded data.
+	   * You should favor that too because of the smaller data network fingerprint.
+	   *
+	   * @return {boolean} True if data are declared to be 8bits encoded.
+	   */
+	  get is_8_bit(){
+	    return !!this.data.getUint32(4, true);
+	  },
+	  /**
+	   * Indicates if the response body is encoded in 16bits.
+	   *
+	   * @return {boolean} True if data are declared to be 16bits encoded.
+	   */
+	  get is_16_bit(){
+	    return !this.is_8_bit;
+	  },
+	  /**
+	   * Returns the number of samples per second.
+	   *
+	   * @return {Integer} Number of samples per second.
+	   */
+	  get sample_rate(){
+	    return this.data.getInt32(8, true);
+	  },
+	  /**
+	   * Returns the scale (number of samples per pixel).
+	   *
+	   * @return {Integer} Number of samples per pixel.
+	   */
+	  get scale(){
+	    return this.data.getInt32(12, true);
+	  },
+	  /**
+	   * Returns the length of the waveform data (number of data points).
+	   *
+	   * @return {Integer} Length of the waveform data.
+	   */
+	  get length(){
+	    return this.data.getUint32(16, true);
+	  },
+	  /**
+	   * Returns a value at a specific offset.
+	   *
+	   * @param {Integer} index
+	   * @return {number} waveform value
+	   */
+	  at: function at_sample(index){
+	    return Math.round(this.data.getInt8(20 + index));
+	  }
+	};
+
+
+/***/ },
+/* 25 */
+/***/ function(module, exports, __webpack_require__) {
+
+	"use strict";
+
+	/**
+	 * Object adapter consumes stringified JSON or JSON waveform data (data format version 1).
+	 * It is used as a data abstraction layer by `WaveformData`.
+	 *
+	 * This is supposed to be a fallback for browsers not supporting ArrayBuffer:
+	 * * **Pros**: easy to debug response_data and quite self describing.
+	 * * **Cons**: slower than ArrayBuffer, more memory consumption.
+	 *
+	 * Also, it is recommended to use the `fromResponseData` factory.
+	 *
+	 * @see WaveformDataObjectAdapter.fromResponseData
+	 * @param {String|Object} response_data JSON or stringified JSON
+	 * @constructor
+	 */
+	var WaveformDataObjectAdapter = module.exports = function WaveformDataObjectAdapter(response_data){
+	  this.data = response_data;
+	};
+
+	/**
+	 * Detects if a set of data is suitable for the Object adapter.
+	 * It is used internally by `WaveformData.create` so you should not bother using it.
+	 *
+	 * @static
+	 * @param {Mixed} data
+	 * @returns {boolean}
+	 */
+	WaveformDataObjectAdapter.isCompatible = function isCompatible(data){
+	  return data && (typeof data === "object" && "sample_rate" in data) || (typeof data === "string" && "sample_rate" in JSON.parse(data));
+	};
+
+	/**
+	 * Setup factory to create an adapter based on heterogeneous input formats.
+	 *
+	 * It is the preferred way to build an adapter instance.
+	 *
+	 * ```javascript
+	 * var objectAdapter = WaveformData.adapters.object;
+	 * var xhr = new XMLHttpRequest();
+	 *
+	 * // .dat file generated by audiowaveform program
+	 * xhr.open("GET", "http://example.com/waveforms/track.json");
+	 * xhr.responseType = "json";
+	 * xhr.addEventListener("load", function onResponse(progressEvent){
+	 *  var responseData = progressEvent.target.response;
+	 *
+	 *  // doing stuff with the raw data ...
+	 *  // you only have access to WaveformDataObjectAdapter API
+	 *  var adapter = objectAdapter.fromResponseData(responseData);
+	 *
+	 *  // or making things easy by using WaveformData ...
+	 *  // you have access WaveformData API
+	 *  var waveform = new WaveformData(responseData, objectAdapter);
+	 * });
+	 *
+	 * xhr.send();
+	 * ```
+
+	 * @static
+	 * @param {String|Object} response_data JSON or stringified JSON
+	 * @return {WaveformDataObjectAdapter}
+	 */
+	WaveformDataObjectAdapter.fromResponseData = function fromJSONResponseData(response_data){
+	  if (typeof response_data === "string"){
+	    return new WaveformDataObjectAdapter(JSON.parse(response_data));
+	  }
+	  else{
+	    return new WaveformDataObjectAdapter(response_data);
+	  }
+	};
+	/**
+	 * @namespace WaveformDataObjectAdapter
+	 */
+	WaveformDataObjectAdapter.prototype = {
+	  /**
+	   * Returns the data format version number.
+	   *
+	   * @return {Integer} Version number of the consumed data format.
+	   */
+	  get version(){
+	    return this.data.version || 1;
+	  },
+	  /**
+	   * Indicates if the response body is encoded in 8bits.
+	   *
+	   * **Notice**: currently the adapter only deals with 8bits encoded data.
+	   * You should favor that too because of the smaller data network fingerprint.
+	   *
+	   * @return {boolean} True if data are declared to be 8bits encoded.
+	   */
+	  get is_8_bit(){
+	    return this.data.bits === 8;
+	  },
+	  /**
+	   * Indicates if the response body is encoded in 16bits.
+	   *
+	   * @return {boolean} True if data are declared to be 16bits encoded.
+	   */
+	  get is_16_bit(){
+	    return !this.is_8_bit;
+	  },
+	  /**
+	   * Returns the number of samples per second.
+	   *
+	   * @return {Integer} Number of samples per second.
+	   */
+	  get sample_rate(){
+	    return this.data.sample_rate;
+	  },
+	  /**
+	   * Returns the scale (number of samples per pixel).
+	   *
+	   * @return {Integer} Number of samples per pixel.
+	   */
+	  get scale(){
+	    return this.data.samples_per_pixel;
+	  },
+	  /**
+	   * Returns the length of the waveform data (number of data points).
+	   *
+	   * @return {Integer} Length of the waveform data.
+	   */
+	  get length(){
+	    return this.data.length;
+	  },
+	  /**
+	   * Returns a value at a specific offset.
+	   *
+	   * @param {Integer} index
+	   * @return {number} waveform value
+	   */
+	  at: function at_sample(index){
+	    return Math.round(this.data.data[index]);
+	  }
+	};
+
 
 /***/ },
 /* 26 */

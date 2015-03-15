@@ -31,33 +31,14 @@
   },
   "license": "LGPL 3",
   "scripts": {
-    "build": "webpack ./src/main.js build/peaks.js",
-    "test": "npm run test-pre && ./node_modules/karma/bin/karma start --single-run",
-    "test-pre": "jshint ./src",
-    "test-watch": "./node_modules/karma/bin/karma start --auto-watch --no-single-run",
-    "changelog": "github-changes -o bbcrd -r peaks.js -n ${npm_package_version} -a --only-pulls --use-commit-body",
-    "start": "serve --cors -p 9000"
+    "build": "webpack ./src/main.js build/peaks.js"
   },
   "devDependencies": {
-    "chai": "^1.9.1",
-    "github-changes": "^0.0.12",
-    "jshint": "^2.5.1",
-    "karma": "^0.12.0",
-    "karma-browserstack-launcher": "^0.1.1",
-    "karma-chrome-launcher": "^0.1.0",
-    "karma-firefox-launcher": "^0.1.0",
-    "karma-html2js-preprocessor": "^0.1",
-    "karma-ievms": "^0.0.4",
-    "karma-mocha": "^0.1.7",
-    "karma-requirejs": "^0.2.2",
-    "karma-safari-launcher": "^0.1.1",
-    "karma-sinon-chai": "^0.2.0",
-    "mocha": "^1.17.1",
-    "serve": "^1.4.0"
+    "jshint": "^2.5.1"
   },
   "dependencies": {
     "eventemitter2": "^0.4.14",
-    "kinetic": "^5.0.6",
+    "kinetic": "git://github.com/sbmaxx/KineticJS.git#master",
     "waveform-data": "git://github.com/sbmaxx/waveform-data.js.git#master"
   }
 }
